@@ -25,9 +25,18 @@ Runtime copied directly through GitHub APIs. No local checkout or project files 
 | Live first job checkpoint | Bryant Park held at rest; Midtown Express advanced from 1/4 to 2/4 (Times Square) |
 | Session frame rate observed | Approximately 30–49 FPS in this browser session; hardware and view dependent |
 
-## Follow-up after UI review
+## Final deployed verification
 
-Map now blocks new keyboard movement and freezes world simulation and contract timer while it is open. Taxi exit zeros the parked taxi's motion. Map search and player labels were translated. These integration changes are syntax checked; the final deployed version is checked again in the browser.
+The first post-deployment reload reused cached scripts. Versioned module URLs were added; the live entry now loads `main.js?v=manhattan-3` and versioned changed dependencies.
+
+- Reopened the versioned live URL after successful Pages deployment.
+- Verified translated "Standort" map label, confirming the updated map module loaded.
+- Started Midtown Express, opened the map, held W for 2.4 seconds and fitted the island. Player stayed exactly x=3.60, y=0.00, z=410.60 and objective timer stayed 9:59 throughout: **pause passed**.
+- Final startup error log: empty.
+- Explicit launcher at gta_vice_cartel_3d.html rendered both Manhattan and preserved-prototype links.
+- Heli climb was also checked in the preceding browser pass: altitude increased from 96 m to 148 m with Space.
+- Taxi exit now zeros parked motion; keyboard movement is blocked while the map is open.
+
 
 ## Practical limits
 

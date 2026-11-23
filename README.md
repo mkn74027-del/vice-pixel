@@ -1,6 +1,6 @@
 # VICE PIXEL
 
-[**Neue Manhattan-Insel spielen**](https://mkn74027-del.github.io/vice-pixel/manhattan/) · [Startseite](https://mkn74027-del.github.io/vice-pixel/) · [Bisheriger Prototyp](https://mkn74027-del.github.io/vice-pixel/legacy.html)
+[**Neue Manhattan-Insel spielen**](https://mkn74027-del.github.io/vice-pixel/manhattan/?v=3) · [Startseite](https://mkn74027-del.github.io/vice-pixel/) · [Bisheriger Prototyp](https://mkn74027-del.github.io/vice-pixel/legacy.html)
 
 Die neue Fassung unter `manhattan/` verwendet die offene Stadtgrundlage **Slop New York** (MIT) mit realer Manhattan-Geografie. Hinzugefügt wurden drei Stadtaufträge, gerichtetes A*-GPS auf dem Verkehrsnetz, Ein-/Aussteigen per F, km/h und deutsche UI-Anpassungen.
 
