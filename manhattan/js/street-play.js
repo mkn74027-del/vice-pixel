@@ -1,7 +1,7 @@
 import {applyImpact,vehicleRay} from './car-damage.js';
 import * as THREE from 'three/webgpu';
 import { RAGDOLL_POINTS } from './ragdoll.js';
-import { createImpactEffects } from './street-effects.js?v=impact62';
+import { createImpactEffects } from './street-effects.js?v=impact63';
 
 const gear=[
   {name:'Fäuste',mag:0,interval:.44},

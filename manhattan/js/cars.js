@@ -1620,15 +1620,6 @@ function createCarWheelMaterial({ instanced = false, style = 0, wheelRadius = BO
 
   const mat = new THREE.MeshStandardNodeMaterial();
   mat.envMapIntensity = 1.35;
-  if(fixed){
-    mat.positionNode=positionLocal.add(move);
-    mat.userData.panelState=sideDents;mat.userData.crushState=dents;
-  }else{
-    // positionLocal already includes the instance transformation in this renderer.
-    const yaw=sideDents.w;
-    mat.positionNode=positionLocal.add(vec3(move.x.mul(cos(yaw)).add(move.z.mul(sin(yaw))),move.y,
-      move.z.mul(cos(yaw)).sub(move.x.mul(sin(yaw)))));
-  }
   mat.colorNode = colorFn();
   mat.roughnessNode = mix(float(0.78), mix(float(0.22), float(0.52), isPolice), isAlloy);
   mat.metalnessNode = mix(float(0.04), mix(float(0.84), float(0.22), isPolice), isAlloy);
@@ -2651,6 +2642,15 @@ function createLoftedCarMaterial(spec, fixedColorHex = null) {
 
   const mat = new THREE.MeshStandardNodeMaterial();
   mat.envMapIntensity = 1.35;
+  if(fixed){
+    mat.positionNode=positionLocal.add(move);
+    mat.userData.panelState=sideDents;mat.userData.crushState=dents;
+  }else{
+    // positionLocal already includes the instance transformation in this renderer.
+    const yaw=sideDents.w;
+    mat.positionNode=positionLocal.add(vec3(move.x.mul(cos(yaw)).add(move.z.mul(sin(yaw))),move.y,
+      move.z.mul(cos(yaw)).sub(move.x.mul(sin(yaw)))));
+  }
   if (fixed) mat.userData.carState = stateUniform;
   const surface = surfaceFn();
   mat.colorNode = surface.get('color');
