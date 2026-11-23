@@ -1,6 +1,6 @@
 import * as THREE from 'three/webgpu';
 import { RAGDOLL_POINTS } from './ragdoll.js';
-import { createImpactEffects } from './street-effects.js?v=street4';
+import { createImpactEffects } from './street-effects.js?v=street41';
 
 const gear=[
   {name:'Fäuste',mag:0,interval:.44},
@@ -48,6 +48,10 @@ export function createStreetPlay({scene,manager,cameraSystem,traffic,audio,map,c
     if(open){if(map.isFullMapOpen)map.toggleFullMap(false);stopInput();panel.showModal();manager.inputBlocked=true;}
     else if(panel.open)panel.close();
   }
+  panel.addEventListener('keydown',e=>{
+    if(e.key==='Escape'){e.preventDefault();menu(false);}
+    e.stopPropagation();
+  });
   panel.addEventListener('close',()=>{manager.inputBlocked=map.isFullMapOpen;manager.resetInput();menuButton.blur();});
   menuButton.addEventListener('click',()=>menu(true));
   panel.querySelector('[data-close]').addEventListener('click',()=>menu(false));
@@ -62,7 +66,10 @@ export function createStreetPlay({scene,manager,cameraSystem,traffic,audio,map,c
     if(action==='hud'){document.body.classList.toggle('street-full');return;}
     selectMode(action);
   });
-  blood.addEventListener('change',()=>effects.setLevel(Number(blood.value)));
+  blood.addEventListener('change',()=>{
+    const level=Number(blood.value);effects.setLevel(level);
+    if(level<2)for(const p of traffic.peds)p.rig.streetLostArm=0;
+  });
   document.getElementById('street-look').addEventListener('click',()=>{
     menu(false);selectMode('person');
     try{const result=canvas.requestPointerLock?.();result?.catch(()=>say('Rechte Maustaste ziehen zum Umschauen.'));}
@@ -81,6 +88,13 @@ export function createStreetPlay({scene,manager,cameraSystem,traffic,audio,map,c
     if(clock-(impacted.get(p)??-100)<.85)return;
     impacted.set(p,clock);
     effects.burst(x,y,z,dx,dz,heavy);
+    if(heavy&&blood.value==='2'&&!p.rig.streetLostArm&&p.ragdoll){
+      const left=Math.random()<.5;
+      const joint=(left?RAGDOLL_POINTS.ELBOW_L:RAGDOLL_POINTS.ELBOW_R)*3;
+      const pos=p.ragdoll.x;
+      p.rig.streetLostArm=left?1:2;
+      effects.separate(pos[joint],pos[joint+1],pos[joint+2],dx,dz);
+    }
     if(audio.streetSound('cry',x,y,z))screams++;
     if(trails.length>=16)trails.shift();
     trails.push({p,x,z,until:clock+2.4});
@@ -171,6 +185,7 @@ export function createStreetPlay({scene,manager,cameraSystem,traffic,audio,map,c
   document.addEventListener('pointerlockchange',()=>{firing=false;refresh();});
   window.addEventListener('keydown',e=>{
     if(e.ctrlKey||e.altKey||e.metaKey||e.isComposing)return;
+    if(e.code==='Escape'&&panel.open){menu(false);return;}
     if(e.code==='Tab'&&(!panel.open||e.target===document.body)){e.preventDefault();if(!e.repeat&&!map.isFullMapOpen)menu(!panel.open);return;}
     if(/INPUT|SELECT|TEXTAREA/.test(e.target?.tagName)||panel.open||map.isFullMapOpen||e.repeat)return;
     if(e.code==='KeyQ'&&ready()){e.preventDefault();equip((index+1)%gear.length);}

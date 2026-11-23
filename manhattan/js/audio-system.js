@@ -1,5 +1,5 @@
 import { createSynthResources, createMotorVoice, setControlRate } from './audio-synthesis.js';
-import { createEventResources, playEvent, createWindVoice } from './audio-events.js?v=street4';
+import { createEventResources, playEvent, createWindVoice } from './audio-events.js?v=street41';
 import { CityAudioSources } from './audio-sources.js';
 import { CityAcoustics } from './audio-acoustics.js';
 
@@ -324,9 +324,9 @@ class CityAudioSystem {
         this.removeEvent(weakest);
       }
       if (this.events.length >= this.limits.events) {
-        let background = this.events.findIndex(event => event.kind !== 'crash' && event.kind !== 'horn');
+        let background = this.events.findIndex(event => event.kind !== 'crash' && event.kind !== 'horn' && event.kind !== 'cry');
         // A struck driver's reaction must still play when the ambience or a pile-up fills the pool.
-        if (background < 0 && options.priority) background = 0;
+        if (background < 0 && options.priority) background = this.events.findIndex(event => event.kind !== 'cry');
         if (background < 0) return false;
         this.removeEvent(background);
       }

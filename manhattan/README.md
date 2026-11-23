@@ -1,6 +1,6 @@
 # VICE PIXEL — Manhattan
 
-[Spielen](https://mkn74027-del.github.io/vice-pixel/manhattan/?v=3)
+[Spielen](https://mkn74027-del.github.io/vice-pixel/manhattan/?v=street41)
 
 Befahrbare Manhattan-Insel mit echter Straßengeometrie, Gebäudeflächen und -höhen, Küsten, Brücken, Stadtverkehr, Fußgängern und Wahrzeichen. Die Umgebung und der Renderer stammen aus [Slop New York](https://github.com/mrdoob/slop-newyork), MIT, Stand `7fdf054aa7a8b1c005983a855fb3b308f2d9a948`. Eigenständige Ergänzungen: drei Stadtaufträge, zeit- und fahrzeugabhängige Kontrollpunkte, Geldbelohnungen, F zum Ein-/Aussteigen ins eigene Taxi, gerichtetes A*-GPS auf dem Verkehrsnetz, deutsche Oberflächenanpassungen und km/h.
 
@@ -14,9 +14,13 @@ Automatische Spielstand- und Sound-Einstellungen werden nur in einer flüchtigen
 
 | Taste / Eingabe | Aktion |
 |---|---|
-| W / S | Vorwärts, bremsen und rückwärts |
-| A / D | Links / rechts lenken oder drehen |
-| Maus ziehen | Kamera frei um Figur / Fahrzeug bewegen |
+| W / S | Zu Fuß vorwärts / rückwärts in Blickrichtung, im Taxi Gas / Bremse |
+| A / D | Zu Fuß seitwärts laufen, im Fahrzeug lenken |
+| Rechte Maustaste ziehen | Zu Fuß umschauen |
+| Shift | Zu Fuß sprinten |
+| Linksklick / G | Gewählte Ausrüstung benutzen / Faustschlag |
+| Q / R | Zu Fuß Ausrüstung wechseln / nachladen |
+| Tab | Spielmenü mit Ausrüstung, Effekten und Anzeigen öffnen |
 | Mausrad | Kameradistanz |
 | F | Am stehenden eigenen Taxi ein-/aussteigen |
 | 1 / 2 / 3 / 4 | Gehen / Taxi / Fahrrad / Helikopter |
@@ -36,7 +40,7 @@ Während die Inselkarte geöffnet ist, pausieren Bewegung und Auftragstimer. Die
 - **Von Uptown nach Downtown:** Central Park South → Flatiron → One World Trade Center, 17:30 Minuten.
 - **Skyline-Pilot:** Vier Wahrzeichen im Heli, 60–240 m Höhe, 10 Minuten.
 
-Kontrollpunkte benötigen 1,2 Sekunden bei geringer Geschwindigkeit. Belohnungen und Zeitbonus werden einmalig pro Abschluss vergeben. Aufträge lassen sich abbrechen und neu starten. Das ist eine erkundbare Stadtgrundlage mit kleinen Aufträgen; die Polizei-, Waffen-, Shop- und Storysysteme des alten Prototyps sind hier noch nicht integriert.
+Kontrollpunkte benötigen 1,2 Sekunden bei geringer Geschwindigkeit. Belohnungen und Zeitbonus werden einmalig pro Abschluss vergeben. Aufträge lassen sich abbrechen und neu starten. Das ist eine erkundbare Stadtgrundlage mit kleinen Aufträgen; die Polizei-, Shop- und Storysysteme des alten Prototyps sind hier noch nicht integriert.
 
 ## Credits
 

@@ -291,6 +291,7 @@ function createPedestrianSystem(network, { player, nearEdges, nearSignals, mayCr
         if (crowded) continue;
       }
       if (p.conversation) endConversation(p.conversation);
+      p.rig.streetLostArm=0;
       Object.assign(p, track);
       p.t = t;
       p.dir = t < track.len * 0.5 ? 1 : -1;

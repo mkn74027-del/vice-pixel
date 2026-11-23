@@ -1341,7 +1341,13 @@ class PersonCrowd {
   add(rig, distance = 0) {
     const l = this.lods.length > 1 && distance > this.farDistance ? this.lods[1] : this.lods[0];
     if (l.count >= l.max) return;
-    l.pose.value.array.set(rig.pose, l.count * STRIDE * 4);
+    const offset=l.count * STRIDE * 4;
+    l.pose.value.array.set(rig.pose, offset);
+    // Alter only the rendered costume. The original joint pose still drives contact and recovery.
+    if (rig.streetLostArm === 1 || rig.streetLostArm === 2) {
+      const bone = rig.streetLostArm === 1 ? BONE.FOREARM_L : BONE.FOREARM_R;
+      l.pose.value.array[offset + bone*8 + 7] = 0.01;
+    }
     l.count++;
   }
 
