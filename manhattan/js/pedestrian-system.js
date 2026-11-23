@@ -1129,7 +1129,7 @@ function createPedestrianSystem(network, { player, nearEdges, nearSignals, mayCr
     p.waiting = false;
     p.walkAt = -1;
     p.shift = p.shiftTarget = 0;
-    if (onHit) onHit(p, mover);
+    if (onHit && !mover.arcadeHit) onHit(p, mover);
   }
 
   function updateFall(p, dt) {
@@ -1216,6 +1216,11 @@ function createPedestrianSystem(network, { player, nearEdges, nearSignals, mayCr
 
   return {
     peds, meshes: pedCrowd.meshes, update, fallen,
+    arcadeHit(p, dx, dz) {
+      if (!p?.placed || p.fall || !p.rig.placed) return false;
+      knockDown(p, {arcadeHit:true, vx:dx*2.6, vz:dz*2.6});
+      return true;
+    },
     setWorld(w) { world = w; },
     setHitListener(listener) { onHit = listener; }
   };

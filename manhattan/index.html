@@ -11,6 +11,14 @@
   <script type="importmap">
     {
       "imports": {
+        "./js/cameras.js": "./js/cameras.js?v=street4",
+        "./js/pedestrians.js": "./js/pedestrians.js?v=street4",
+        "./js/traffic.js": "./js/traffic.js?v=street4",
+        "./js/pedestrian-system.js": "./js/pedestrian-system.js?v=street4",
+        "./js/audio-system.js": "./js/audio-system.js?v=street4",
+        "./js/audio-events.js": "./js/audio-events.js?v=street4",
+        "./js/controllers.js": "./js/controllers.js?v=street4",
+        "./js/vice-contracts.js": "./js/vice-contracts.js?v=street4",
         "three": "https://cdn.jsdelivr.net/gh/mrdoob/three.js@8b92052852735b67cfa8393f78e707b3f07a0eec/build/three.webgpu.js",
         "three/webgpu": "https://cdn.jsdelivr.net/gh/mrdoob/three.js@8b92052852735b67cfa8393f78e707b3f07a0eec/build/three.webgpu.js",
         "three/tsl": "https://cdn.jsdelivr.net/gh/mrdoob/three.js@8b92052852735b67cfa8393f78e707b3f07a0eec/build/three.tsl.js",
@@ -35,7 +43,7 @@
   <link rel="modulepreload" href="./js/helicopter.js" />
   <link rel="modulepreload" href="./js/vehicle-lights.js" />
   <link rel="modulepreload" href="./js/vehicle-physics.js" />
-  <link rel="modulepreload" href="./js/pedestrians.js" />
+  <link rel="modulepreload" href="./js/pedestrians.js?v=street4" />
   <link rel="modulepreload" href="./js/ragdoll.js" />
   <link rel="modulepreload" href="./js/lighting.js" />
   <link rel="modulepreload" href="./js/city-grid.js" />
@@ -54,26 +62,26 @@
   <link rel="modulepreload" href="./js/subway-entrances.js" />
   <link rel="modulepreload" href="./js/road-network.js" />
   <link rel="modulepreload" href="./js/road-paint.js" />
-  <link rel="modulepreload" href="./js/traffic.js" />
-  <link rel="modulepreload" href="./js/pedestrian-system.js" />
+  <link rel="modulepreload" href="./js/traffic.js?v=street4" />
+  <link rel="modulepreload" href="./js/pedestrian-system.js?v=street4" />
   <link rel="modulepreload" href="./js/pedestrian-routes.js" />
-  <link rel="modulepreload" href="./js/controllers.js?v=manhattan-3" />
+  <link rel="modulepreload" href="./js/controllers.js?v=street4" />
   <link rel="modulepreload" href="./js/touch-controls.js" />
   <link rel="modulepreload" href="./js/gamepad-controls.js" />
-  <link rel="modulepreload" href="./js/cameras.js" />
+  <link rel="modulepreload" href="./js/cameras.js?v=street4" />
   <link rel="modulepreload" href="./js/nyc-map.js?v=manhattan-3" />
   <link rel="modulepreload" href="./js/scene-culling.js" />
   <link rel="modulepreload" href="./js/post-processing.js" />
   <link rel="modulepreload" href="./js/audio-synthesis.js" />
-  <link rel="modulepreload" href="./js/audio-events.js" />
+  <link rel="modulepreload" href="./js/audio-events.js?v=street4" />
   <link rel="modulepreload" href="./js/audio-sources.js" />
   <link rel="modulepreload" href="./js/audio-acoustics.js" />
-  <link rel="modulepreload" href="./js/audio-system.js" />
+  <link rel="modulepreload" href="./js/audio-system.js?v=street4" />
   <link rel="modulepreload" href="./js/main.js" />
   <script>window.__viceStorage=(()=>{const memory=new Map();return {getItem:key=>memory.get(key)??null,setItem:(key,value)=>memory.set(key,String(value)),removeItem:key=>memory.delete(key)};})();</script>
-  <script type="module" src="./js/main.js?v=manhattan-3"></script>
+  <script type="module" src="./js/main.js?v=street4"></script>
   <!-- Inter (UI) & Overpass (street-name signs: modelled on Highway Gothic, the US road sign typeface) -->
-  <link rel="stylesheet" href="./css/style.css?v=vice-manhattan-1" />
+  <link rel="stylesheet" href="./css/style.css?v=street4" />
 </head>
 <body>
   <!-- Icon sprite (24 × 24 stroke icons, drawn in currentColor) -->
@@ -332,5 +340,16 @@
   </section>
 
 <a class="vice-credits" href="https://github.com/mkn74027-del/vice-pixel/tree/main/manhattan#credits" target="_blank" rel="noopener">Stadt: Slop New York (MIT) · NYC / MTA · © OpenStreetMap</a>
+<div id="street-bar"><span id="street-gear">Fäuste</span><button id="street-menu-button" type="button">Menü <kbd>Tab</kbd></button></div>
+  <div id="street-reticle" hidden aria-hidden="true"></div><div id="street-notice" role="status" hidden></div>
+  <dialog id="street-menu" aria-labelledby="street-title">
+    <header><h2 id="street-title">Spielmenü</h2><button data-close type="button" autofocus>Weiterspielen</button></header>
+    <dl><dt>WASD</dt><dd>In Blickrichtung laufen</dd><dt>Shift / Leertaste</dt><dd>Sprinten / springen</dd><dt>Rechte Maustaste ziehen</dt><dd>Umschauen</dd><dt>Linksklick</dt><dd>Mit Fäusten schlagen oder mit der gewählten Waffe schießen</dd><dt>G / Q / R</dt><dd>Schlagen / Waffe wechseln / nachladen</dd><dt>F / M</dt><dd>Am Taxi einsteigen / Karte öffnen</dd></dl>
+    <div class="street-options"><label>Ausrüstung <select id="street-loadout"><option value="0">Fäuste</option><option value="1">Arcade-Pistole</option><option value="2">Impuls-MP</option></select></label>
+    <label>Blut &amp; Gore <select id="street-blood"><option value="2" selected>Extrem</option><option value="1">Reduziert</option><option value="0">Aus</option></select></label></div>
+    <div class="street-actions"><button id="street-look" type="button">Freier Mausblick · Esc löst</button><button data-play-action="map">Inselkarte</button><button data-play-action="jobs">Aufträge</button><button data-play-action="camera">Kamera wechseln</button><button data-play-action="sound">Ton umschalten</button><button data-play-action="hud">Alle Anzeigen umschalten</button></div>
+    <nav aria-label="Fortbewegung"><button data-play-action="person">Gehen 1</button><button data-play-action="car">Taxi 2</button><button data-play-action="cyclist">Rad 3</button><button data-play-action="helicopter">Heli 4</button></nav>
+    <a href="https://github.com/mkn74027-del/vice-pixel/tree/main/manhattan#credits">Stadt und Kartendaten · Slop New York, NYC, MTA und © OpenStreetMap</a>
+  </dialog>
 </body>
 </html>

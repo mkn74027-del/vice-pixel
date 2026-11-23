@@ -287,6 +287,38 @@ function signal(ctx, walk) {
   }, 0.45);
 }
 
+// A falling vowel and a breathy tail. Several pitches prevent a crowd from sounding like one loop.
+function alarmCry(ctx, variant) {
+  const random = randomSource(710 + variant);
+  const duration = 0.54 + variant * 0.055;
+  const base = 205 + variant * 36;
+  let phase = 0, breath = 0;
+  return makeBuffer(ctx, duration, t => {
+    const u = t / duration;
+    const pitch = base * (1 + 0.68 * Math.sin(Math.min(1,u*3.8)*Math.PI/2) - 0.78*u)
+      * (1 + 0.025*Math.sin(39*t) + 0.014*Math.sin(71*t));
+    phase += TAU * pitch / ctx.sampleRate;
+    let vowel = 0;
+    for (let h=1; h<=10; h++) {
+      const hz=h*pitch;
+      const weight=0.25/h + Math.exp(-(((hz-790)/240)**2)) + 0.64*Math.exp(-(((hz-1430)/290)**2));
+      vowel += weight * Math.sin(h*phase) / Math.sqrt(h);
+    }
+    breath += ((random()*2-1)-breath)*0.32;
+    const envelope = Math.min(1,u*17) * Math.pow(1-u,0.72);
+    return (vowel+breath*(0.18+u*0.65))*envelope;
+  }, 0.82);
+}
+
+function arcadePop(ctx, variant) {
+  const random = randomSource(871 + variant);
+  let filtered=0;
+  return makeBuffer(ctx,0.17,t=>{
+    filtered += (random()*2-1-filtered)*0.68;
+    return filtered*Math.exp(-t*46) + Math.sin(TAU*(178*t-220*t*t))*Math.exp(-t*31)*0.48;
+  },0.72);
+}
+
 export function createEventResources(ctx, resources) {
   const speakers = [
     { pitch: 99, formants: 0.88, breath: 0.06 }, { pitch: 119, formants: 0.94, breath: 0.10 },
@@ -295,6 +327,8 @@ export function createEventResources(ctx, resources) {
   ];
   return {
     ...resources,
+    cries: Array.from({length:4},(_,i)=>alarmCry(ctx,i)),
+    pops: Array.from({length:2},(_,i)=>arcadePop(ctx,i)),
     footsteps: Array.from({ length: 8 }, (_, i) => footstep(ctx, i + 1)),
     syllables: speakers.map((speaker, voice) => Array.from({ length: 4 }, (_, i) => speechFragment(ctx, speaker, i + voice * 4 + 20))),
     horns: [0.22, 0.37, 0.55].map((duration, i) => horn(ctx, duration, 17 + i)),
@@ -313,7 +347,7 @@ export function playEvent(ctx, resources, kind, output, options = {}) {
   const random = randomSource(options.seed);
   const start = Math.max(ctx.currentTime, finite(options.when, ctx.currentTime));
   const intensity = clamp(finite(options.intensity, 1));
-  const levels = { footstep: 0.22, talk: 0.065, horn: 0.23, signal: 0.13, crash: 0.35 };
+  const levels = { footstep: 0.22, talk: 0.065, horn: 0.23, signal: 0.13, crash: 0.35, cry: 0.85, shot: 0.39 };
   if (!Object.hasOwn(levels, kind) || intensity === 0) return { endTime: start, dispose() {} };
   const gain = ctx.createGain();
   gain.gain.value = intensity * levels[kind];
@@ -363,7 +397,11 @@ export function playEvent(ctx, resources, kind, output, options = {}) {
     return end;
   };
 
-  if (kind === 'footstep') {
+  if (kind === 'cry') {
+    play(resources.cries[Math.floor(random()*resources.cries.length)],start,0.93+random()*0.14);
+  } else if (kind === 'shot') {
+    play(resources.pops[options.variant || 0],start,options.variant ? 1.15 : 0.92);
+  } else if (kind === 'footstep') {
     const speed = clamp(Math.abs(finite(options.speed)) / 8);
     play(resources.footsteps[Math.floor(random() * resources.footsteps.length)], start, 0.9 + random() * 0.17 + speed * 0.13);
   } else if (kind === 'talk') {

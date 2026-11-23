@@ -1,5 +1,5 @@
 import { createSynthResources, createMotorVoice, setControlRate } from './audio-synthesis.js';
-import { createEventResources, playEvent, createWindVoice } from './audio-events.js';
+import { createEventResources, playEvent, createWindVoice } from './audio-events.js?v=street4';
 import { CityAudioSources } from './audio-sources.js';
 import { CityAcoustics } from './audio-acoustics.js';
 
@@ -303,8 +303,8 @@ class CityAudioSystem {
     const now = this.context.currentTime;
     const crash = kind === 'crash';
     const severity = clamp(options.severity ?? options.intensity ?? 1, 0, 1);
-    const ref = crash ? 4 + severity * 8 : kind === 'horn' ? 8 : kind === 'talk' ? 2 : 1.8;
-    const range = crash ? 50 + severity * 110 : kind === 'horn' ? 140 : kind === 'talk' ? 30 : kind === 'footstep' ? 22 : 35;
+    const ref = kind === 'cry' ? 9 : kind === 'shot' ? 7 : crash ? 4 + severity * 8 : kind === 'horn' ? 8 : kind === 'talk' ? 2 : 1.8;
+    const range = kind === 'cry' ? 80 : kind === 'shot' ? 65 : crash ? 50 + severity * 110 : kind === 'horn' ? 140 : kind === 'talk' ? 30 : kind === 'footstep' ? 22 : 35;
     if (Math.hypot(source.x - this.listener.x, source.y - this.listener.y, source.z - this.listener.z) > range) return false;
     if (crash || options.priority) {
       // Impacts are immediate, between the 10 Hz ambience updates. Reclaim finished events first, then let
@@ -335,10 +335,15 @@ class CityAudioSystem {
     const emitter = new SpatialEmitter(this.context, this.mix, this.reflections, this.acoustics,
       ref, kind === 'talk' ? 1.5 : 0, kind === 'horn');
     // Do not fade away the first few milliseconds of a crash: its spatial gain and filtering are ready at onset.
-    emitter.update(source, this.listener, now, range, true, crash);
+    emitter.update(source, this.listener, now, range, true, crash || kind === 'cry' || kind === 'shot');
     const voice = playEvent(this.context, this.resources, kind, emitter.input, { seed: source.seed, ...options });
     this.events.push({ kind, voice, emitter, id: source.id, range, severity, position: { ...source }, follow: kind === 'talk' || kind === 'horn' });
     return true;
+  }
+
+  streetSound(kind, x, y, z, variant = 0) {
+    if (!this.ready || !this.enabled || !this.haveListener || this.context?.state !== 'running' || document.hidden) return false;
+    return this.emit(kind, {x,y,z,seed:++this.collisionSequence}, {priority:true, variant});
   }
 
   crash(impact) {

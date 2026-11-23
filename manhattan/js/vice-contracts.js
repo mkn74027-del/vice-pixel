@@ -46,7 +46,7 @@ export function createCityContracts({scene,controllerManager:manager,mapSystem,c
   const flightRing=new THREE.Mesh(new THREE.TorusGeometry(18,.55,6,48),mat);marker.add(flightRing);
 
   function tell(message){toast.textContent=message;toast.hidden=false;toastTime=6;}
-  function setPanel(open){panel.hidden=!open;toggle.setAttribute('aria-expanded',String(open));manager.resetInput();}
+  function setPanel(open){panel.hidden=!open;root.classList.toggle('jobs-open',open);if(open && document.pointerLockElement)document.exitPointerLock();toggle.setAttribute('aria-expanded',String(open));manager.resetInput();}
   toggle.addEventListener('click',()=>setPanel(panel.hidden));
   cancel.addEventListener('click',()=>stopJob('Auftrag abgebrochen. Freie Fahrt.'));
   function stopJob(message){active=null;marker.visible=false;cancel.hidden=true;fill.style.width='0%';tell(message);}
@@ -56,7 +56,7 @@ export function createCityContracts({scene,controllerManager:manager,mapSystem,c
     mapSystem.waypoint={x:p.x,z:p.z,name:p.name};
     const air=active.job.mode==='helicopter';
     marker.position.set(p.x,air?105:manager.getGroundHeight(p.x,p.z,'car')+.18,p.z);
-    marker.visible=true;ring.visible=beam.visible=!air;flightRing.visible=air;mapSystem.miniDrawn=null;
+    marker.visible=true;marker.updateMatrixWorld(true);ring.visible=beam.visible=!air;flightRing.visible=air;mapSystem.miniDrawn=null;
   }
   function startJob(job){
     lastJob=job;active={job,stage:0,left:job.seconds,held:0,elapsed:0};
@@ -80,7 +80,7 @@ export function createCityContracts({scene,controllerManager:manager,mapSystem,c
     manager.resetInput();
   }
   window.addEventListener('keydown',e=>{
-    if(isTypingInField(e)||e.repeat||e.ctrlKey||e.altKey||e.metaKey)return;
+    if(manager.inputBlocked||document.getElementById('street-menu')?.open||isTypingInField(e)||e.repeat||e.ctrlKey||e.altKey||e.metaKey)return;
     if(e.code==='KeyJ'){e.preventDefault();setPanel(panel.hidden);}
     if(e.code==='KeyF'&&!mapSystem.isFullMapOpen){e.preventDefault();enterExit();}
   });
@@ -131,7 +131,7 @@ export function createCityContracts({scene,controllerManager:manager,mapSystem,c
       }
     }else if(uiClock>.15){
       status.textContent='Freie Fahrt · '+completed+' Aufträge erledigt';
-      context.textContent='WASD bewegen · F Taxi · Maus ziehen: Kamera · M Karte · J Aufträge';
+      context.textContent='WASD bewegen · M Karte · Tab Spielmenü';
     }
     previous={x:p.x,z:p.z};
     if(uiClock>.15)uiClock=0;

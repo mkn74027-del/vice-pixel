@@ -1,6 +1,6 @@
 import * as THREE from 'three/webgpu';
 import { buildRoadNetwork } from './road-network.js';
-import { createPedestrianSystem } from './pedestrian-system.js';
+import { createPedestrianSystem } from './pedestrian-system.js?v=street4';
 import { vehicleContact, resolveVehicleContact, sweptVehicleContact } from './vehicle-physics.js';
 import { createMover, vehicleShape } from './ragdoll.js';
 import { signalPhase, walkSignal } from './city-config.js';
@@ -591,7 +591,9 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
   const pedestrianSystem = createPedestrianSystem(network, {
     player, nearEdges, nearSignals, mayCross, walkOn, visible, nearView, movers
   });
+  let onPersonImpact = null;
   pedestrianSystem.setHitListener((p, m) => {
+    onPersonImpact?.(p,m);
     const speed = Math.hypot(m.vx, m.vz);
     const dx = p.x - m.x, dz = p.z - m.z, d = Math.hypot(dx, dz) || 1;
     reportCollision(m.ref, p, p.x, 0.9, p.z, dx / d, dz / d, speed, 'pedestrian');
@@ -2287,6 +2289,8 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
     cars,
     buses,
     peds: pedestrianSystem.peds,
+    arcadeHit: pedestrianSystem.arcadeHit,
+    setPersonImpactFeedback(listener) { onPersonImpact=listener; },
     fallen: pedestrianSystem.fallen,
     setWorld: pedestrianSystem.setWorld,
     network

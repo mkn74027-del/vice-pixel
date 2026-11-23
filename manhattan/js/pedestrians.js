@@ -2580,7 +2580,9 @@ class PersonRig {
         ? lerp(0.88, 0.22, descendReach)
         : lerp(-0.56, -0.14, descendReach);
       const airFlex = lerp(jumpStandFlex, jumpRunFlex, moveJump);
-      const flex = lerp(groundFlex, airFlex, airB);
+      const swinging = i === this.streetSide ? (this.streetPunch || 0) : 0;
+      const raised = i === 1 && this.streetGear;
+      const flex = raised ? 1.13 : lerp(lerp(groundFlex, airFlex, airB), 1.63, swinging);
 
       const jumpAbd = 0.14 + 0.2 * Math.sin(Math.PI * jumpProg) + (oppLead < 0 ? 0.08 * moveJump : 0);
       const abduction = 0.095 + (this.girth - 1) * 0.35 + run * (0.06 + 0.03 * sprint) + this.back * run * 0.05
@@ -2600,7 +2602,7 @@ class PersonRig {
       const standAirElbow = (1.28 * launchUp + 0.48 * ascentArc) * (1 - 0.8 * descendReach) + 0.2 * descendReach;
       const runAirElbow = oppLead > 0 ? lerp(1.38, 1.1, descendReach) : lerp(0.95, 1.08, descendReach);
       const airElbow = lerp(standAirElbow, runAirElbow, moveJump);
-      const elbow = lerp(groundElbow, airElbow, airB);
+      const elbow = raised ? 0.36 : lerp(lerp(groundElbow, airElbow, airB), 0.16, swinging);
       this.jointFrom(LIMB.upperArm[i], LIMB.forearm[i], _qUpper, _shoulder, _v);
       this.writeBone(LIMB.forearm[i], _q2.copy(_qUpper).multiply(qX(_q, -elbow)), _v);
     }

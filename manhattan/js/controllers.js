@@ -196,7 +196,7 @@ class ThirdPersonControllerManager {
     this.scene = scene;
     this.colliders = colliders;
     this._colliderCells = null; // built on first use, see nearColliders()
-    this.activeMode = 'car'; // 'person' | 'car' | 'cyclist' | 'helicopter'
+    this.activeMode = 'person'; // 'person' | 'car' | 'cyclist' | 'helicopter'
 
     this.keys = {
       forward: false,
@@ -265,7 +265,9 @@ class ThirdPersonControllerManager {
 
     const onKey = (e, isDown) => {
       const action = actionsByCode.get(e.code);
-      if (!action || (isDown && (isTypingInField(e) || this.inputBlocked))) return;
+      if (isDown && (isTypingInField(e) || this.inputBlocked)) return;
+      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') this.sprinting = isDown;
+      if (!action) return;
       if (isDown) this._pressedCodes.add(e.code);
       else this._pressedCodes.delete(e.code);
       // Releasing one binding must not cancel another key held for the same action.
@@ -316,6 +318,7 @@ class ThirdPersonControllerManager {
   }
 
   resetInput() {
+    this.sprinting = false;
     this._pressedCodes.clear();
     this._keyboardKeys = {};
     this._touchKeys = {};
@@ -357,6 +360,7 @@ class ThirdPersonControllerManager {
     }
     ent.speed = 0;
     if (this.activeMode === 'person') {
+      ent.walkVX = ent.walkVZ = 0;
       ent.verticalVel = 0;
       ent.jumping = false;
       ent.jumpPrep = 0;
@@ -1166,37 +1170,27 @@ class ThirdPersonControllerManager {
   updatePerson(dt) {
     if (dt <= 0) return;
     const p = this.entities.person;
-    const maxSpeed = 8.2;
-    const turnRate = 2.6;
-
-    let targetSpeed = 0;
-    if (this.keys.forward) targetSpeed = maxSpeed * this.keys.forward;
-    else if (this.keys.backward) targetSpeed = -maxSpeed * 0.65 * this.keys.backward;
-
-    if (this.keys.left) p.heading += turnRate * dt * this.keys.left;
-    if (this.keys.right) p.heading -= turnRate * dt * this.keys.right;
-
-    const accelerating = Math.abs(targetSpeed) > Math.abs(p.speed) && p.speed * targetSpeed >= 0;
-    const acceleration = accelerating ? 5.5 * Math.abs(targetSpeed) / maxSpeed : 12;
-    p.speed += Math.max(-acceleration * dt, Math.min(acceleration * dt, targetSpeed - p.speed));
-
-    const prevX = p.position.x;
-    const prevZ = p.position.z;
-    p.prevX = prevX;
-    p.prevZ = prevZ;
-    const sinH = Math.sin(p.heading);
-    const cosH = Math.cos(p.heading);
-    const nextX = prevX + sinH * p.speed * dt;
-    const nextZ = prevZ + cosH * p.speed * dt;
-    p.position.x = nextX;
-    p.position.z = nextZ;
+    const view = this.walkViewYaw ?? p.heading;
+    const forward = Number(this.keys.forward) - Number(this.keys.backward);
+    const right = Number(this.keys.right) - Number(this.keys.left);
+    const length = Math.max(1, Math.hypot(forward, right));
+    const pace = this.sprinting ? 8.2 : 4.7;
+    // The camera looks along (sin(yaw), cos(yaw)); screen-right is (-cos, sin).
+    const targetX = (Math.sin(view) * forward - Math.cos(view) * right) * pace / length;
+    const targetZ = (Math.cos(view) * forward + Math.sin(view) * right) * pace / length;
+    const ease = 1 - Math.exp(-dt * (forward || right ? 20 : 28));
+    p.walkVX = (p.walkVX || 0) + (targetX - (p.walkVX || 0)) * ease;
+    p.walkVZ = (p.walkVZ || 0) + (targetZ - (p.walkVZ || 0)) * ease;
+    p.prevX = p.position.x;
+    p.prevZ = p.position.z;
+    p.position.x += p.walkVX * dt;
+    p.position.z += p.walkVZ * dt;
     this.resolveHorizontalCollision(p.position, 0.48, null, p);
-
-    // Prevent phantom speed buildup when blocked head-on by a building or shoreline boundary
-    if (Math.abs(p.position.x - nextX) > 1e-6 || Math.abs(p.position.z - nextZ) > 1e-6) {
-      const actualFwd = ((p.position.x - prevX) * sinH + (p.position.z - prevZ) * cosH) / dt;
-      if (p.speed > 0 && actualFwd < p.speed) p.speed = Math.max(0, actualFwd);
-      else if (p.speed < 0 && actualFwd > p.speed) p.speed = Math.min(0, actualFwd);
+    p.speed = Math.hypot(p.position.x - p.prevX, p.position.z - p.prevZ) / dt;
+    if (forward || right || this.aiming) {
+      const desired = this.aiming ? view : Math.atan2(targetX, targetZ);
+      const delta = desired - p.heading;
+      p.heading += Math.atan2(Math.sin(delta), Math.cos(delta)) * (1 - Math.exp(-18 * dt));
     }
 
     const groundY = this.getGroundHeight(p.position.x, p.position.z, 'person');

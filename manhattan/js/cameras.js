@@ -35,6 +35,9 @@ class CameraSystem {
     );
 
     this.activePresetId = 'chase';
+    this.walkYaw = controllerManager.entities.person.heading;
+    this.walkPitch = 0.07;
+    this.cameraContact = {};
     this.orbitYawOffset = 0.0;
     this.orbitPitchOffset = 0.09;
     this.zoomMultiplier = 1.0;
@@ -62,8 +65,25 @@ class CameraSystem {
     const pointers = new Map();
     canvas.style.touchAction = 'none';
 
+    const onFoot = () => this.controllerManager.activeMode === 'person';
+    const rotate = (dx, dy) => {
+      if (onFoot()) {
+        this.walkYaw -= dx * 0.0035;
+        this.walkPitch = Math.max(-0.95, Math.min(1.05, this.walkPitch + dy * 0.0035));
+      } else {
+        this.orbitYawOffset -= dx * 0.0065;
+        this.orbitPitchOffset = Math.max(-0.32, Math.min(0.68, this.orbitPitchOffset + dy * 0.005));
+      }
+    };
+    canvas.addEventListener('contextmenu', e => e.preventDefault());
+    document.addEventListener('mousemove', e => {
+      if (document.pointerLockElement === canvas && onFoot() && !this.controllerManager.inputBlocked)
+        rotate(e.movementX, e.movementY);
+    });
     canvas.addEventListener('pointerdown', (e) => {
-      if (e.button !== 0 || pointers.size >= 2) return;
+      if (this.controllerManager.inputBlocked) return;
+      if (onFoot() && e.pointerType === 'mouse' && e.button === 0) return;
+      if ((e.button !== 0 && e.button !== 2) || pointers.size >= 2 || document.pointerLockElement === canvas) return;
       // Only two touch pointers may share a gesture; mouse and pen drags stay independent.
       if (pointers.size && (e.pointerType !== 'touch' || pointers.values().next().value.type !== 'touch')) return;
       e.preventDefault();
@@ -90,8 +110,7 @@ class CameraSystem {
           this.zoomMultiplier = Math.max(0.45, Math.min(2.4, this.zoomMultiplier * previousDistance / distance));
         }
       } else {
-        this.orbitYawOffset -= dx * 0.0065;
-        this.orbitPitchOffset = Math.max(-0.32, Math.min(0.68, this.orbitPitchOffset + dy * 0.005));
+        rotate(dx, dy);
       }
       this.userOrbitTimer = 4.0;
     });
@@ -136,6 +155,10 @@ class CameraSystem {
     // POV uses the orbit angles, but only chase renders a zoomed camera distance.
     if (this.activePresetId !== 'chase') zoom = 0;
     if (!lookX && !lookY && !zoom) return;
+    if (this.controllerManager.activeMode === 'person') {
+      this.walkYaw -= lookX * 2 * dt;
+      this.walkPitch = Math.max(-0.95, Math.min(1.05, this.walkPitch + lookY * 1.3 * dt));
+    }
     this.orbitYawOffset -= lookX * 2.0 * dt;
     this.orbitPitchOffset = Math.max(-0.32, Math.min(0.68, this.orbitPitchOffset + lookY * 1.25 * dt));
     this.zoomMultiplier = Math.max(0.45, Math.min(2.4, this.zoomMultiplier + zoom * 0.9 * dt));
@@ -154,6 +177,7 @@ class CameraSystem {
     this._clearPointers();
     this.isDragging = false;
     this.resetOrbit();
+    if (this.controllerManager.activeMode === 'person') this.walkYaw = this.controllerManager.entities.person.heading;
     this.smoothedSpeed = 0;
     this.followEntity = null;
     this.followOffset.set(0, 0, 0);
@@ -196,7 +220,8 @@ class CameraSystem {
       this.camera.updateProjectionMatrix();
     }
 
-    const totalYaw = entity.heading + this.orbitYawOffset;
+    const walking = entity.type === 'person';
+    const totalYaw = walking ? this.walkYaw : entity.heading + this.orbitYawOffset;
 
     switch (this.activePresetId) {
       case 'chase': {
@@ -338,7 +363,33 @@ class CameraSystem {
       }
     }
 
-    if (!this.initialized || this.activePresetId === 'pov') {
+    if (walking && preset.category === 'follow') {
+      const first = this.activePresetId === 'pov';
+      const back = first ? 0 : (this.activePresetId === 'action' ? 2.5 : 3.55) * this.zoomMultiplier;
+      const side = first ? 0 : 0.62;
+      const yawSin = Math.sin(this.walkYaw), yawCos = Math.cos(this.walkYaw);
+      const pitchCos = Math.cos(this.walkPitch), pitchSin = Math.sin(this.walkPitch);
+      const eye = entity.position.y + 1.56;
+      const dx = -yawSin * pitchCos * back - yawCos * side;
+      const dy = pitchSin * back + (first ? 0 : 0.32);
+      const dz = -yawCos * pitchCos * back + yawSin * side;
+      let fraction = 1;
+      if (back > 0) {
+        const nearby = this.controllerManager.nearColliders(entity.position.x, entity.position.z, back + 1);
+        // Pull in before the lens meets a wall, pole or sidewalk.
+        for (let t=0.12; t<=1.06; t+=0.12) {
+          const f=Math.min(t,1), x=entity.position.x+dx*f, y=eye+dy*f, z=entity.position.z+dz*f;
+          if (y < this.controllerManager.getGroundHeight(x,z,'person') + 0.3 ||
+              nearby.some(c=>this.controllerManager.sphereContact(c,x,y,z,0.23,this.cameraContact))) {
+            fraction = Math.max(0, f - 0.13);
+            break;
+          }
+        }
+      }
+      desiredPos.set(entity.position.x+dx*fraction,eye+dy*fraction,entity.position.z+dz*fraction);
+      desiredLook.set(desiredPos.x+yawSin*pitchCos*20,desiredPos.y-pitchSin*20,desiredPos.z+yawCos*pitchCos*20);
+    }
+    if (!this.initialized || this.activePresetId === 'pov' || (walking && preset.category === 'follow')) {
       this.currentPos.copy(desiredPos);
       this.currentLookAt.copy(desiredLook);
       this.initialized = true;

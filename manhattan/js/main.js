@@ -1,4 +1,5 @@
-import { createCityContracts } from './vice-contracts.js?v=manhattan-3';
+import { createStreetPlay } from './street-play.js?v=street4';
+import { createCityContracts } from './vice-contracts.js?v=street4';
 import { createNavigator } from './vice-gps.js';
 import * as THREE from 'three/webgpu';
 import { pass, mrt, output, normalView, positionView, metalness, roughness, vec2, smoothstep } from 'three/tsl';
@@ -16,7 +17,7 @@ import { buildCityBlocks } from './buildings.js';
 import { buildStreetDetails } from './street-details.js';
 import { createTrafficSystem, createHighwayTraffic } from './traffic.js';
 import { buildRoadPaint } from './road-paint.js';
-import { ThirdPersonControllerManager } from './controllers.js?v=manhattan-3';
+import { ThirdPersonControllerManager } from './controllers.js?v=street4';
 import { TouchControls } from './touch-controls.js';
 import { GamepadControls } from './gamepad-controls.js';
 import { CameraSystem, CAMERA_PRESETS } from './cameras.js';
@@ -323,7 +324,7 @@ async function initApp() {
 
   // Keyboard guide for each mode: [keys, action]
   const controlHints = {
-    person: [[['W', 'S'], 'Gehen / Laufen'], [['A', 'D'], 'Drehen'], [['Space'], 'Springen'], [['Drag'], 'Kamera drehen']],
+    person: [[['WASD'], 'Laufen'], [['Shift'], 'Sprint'], [['G'], 'Schlagen'], [['Q'], 'Waffe wechseln']],
     car: [[['W', 'S'], 'Gas / Bremse / Rückwärts'], [['A', 'D'], 'Lenken'], [['B'], 'Hupe'], [['Drag'], 'Kamera drehen']],
     cyclist: [[['W', 'S'], 'Treten / Bremsen'], [['Space'], 'Bremse'], [['A', 'D'], 'Lenken'], [['Drag'], 'Kamera drehen']],
     helicopter: [[['W', 'S'], 'Pitch'], [['A', 'D'], 'Yaw'], [['Space', 'E'], 'Steigen'], [['Q', 'C'], 'Sinken']]
@@ -359,7 +360,14 @@ async function initApp() {
   }
 
   function selectMode(mode) {
+    const previousMode = controllerManager.activeMode;
     controllerManager.setMode(mode);
+    if (previousMode !== mode) {
+      if (mode === 'person') cameraSystem.walkYaw=controllerManager.entities.person.heading;
+      if (document.pointerLockElement) document.exitPointerLock();
+      controllerManager.resetInput();
+      cameraSystem.setCameraPreset('chase',true);
+    }
     touchControls.setMode(controllerManager.activeMode);
     gamepadControls.reset();
     modeButtons.forEach((btn) => {
@@ -543,6 +551,7 @@ async function initApp() {
     onToggle: (open) => {
       controllerManager.resetInput();
       controllerManager.inputBlocked = open;
+      if(open && document.pointerLockElement) document.exitPointerLock();
       touchControls.setEnabled(!open);
       gamepadControls.setEnabled(!open);
       const mapHint = document.getElementById('fullmap-hover-info');
@@ -554,6 +563,7 @@ async function initApp() {
   });
 
   const cityContracts = createCityContracts({ scene, controllerManager, mapSystem, cameraSystem, selectMode });
+  const streetPlay=createStreetPlay({scene,manager:controllerManager,cameraSystem,traffic:trafficSystem,audio:audioSystem,map:mapSystem,canvas:renderer.domElement,selectMode});
   mapSystem.routeProvider = createNavigator(trafficSystem.network, controllerManager);
 
   teleportButtons.forEach((btn) => {
@@ -583,7 +593,7 @@ async function initApp() {
 
   // Global keyboard shortcuts for modes (1-4), cameras (V / 5-0), and HUD (H)
   window.addEventListener('keydown', (e) => {
-    if (isTypingInField(e)) return;
+    if (isTypingInField(e) || streetPlay.menuOpen || mapSystem.isFullMapOpen) return;
     switch (e.code) {
       case 'Digit1':
         selectMode('person');
@@ -741,11 +751,12 @@ async function initApp() {
     const rawDt = (now - lastTime) * 0.001;
     lastTime = now;
     const dt = Math.min(Math.max(rawDt, 0.001), 0.05);
-    const worldDt = mapSystem.isFullMapOpen ? 0 : dt;
+    const worldDt = mapSystem.isFullMapOpen || streetPlay.menuOpen ? 0 : dt;
     elapsed += worldDt;
 
     // Update 3rd-person controllers, camera, signals, traffic & vehicle collisions, building LODs, and dynamic shadow focus
-    gamepadControls.update(worldDt);
+    if (!streetPlay.menuOpen) gamepadControls.update(worldDt);
+    controllerManager.walkViewYaw = cameraSystem.walkYaw;
     if (worldDt > 0) controllerManager.update(worldDt, elapsed, cameraSystem.initialized ? cameraSystem.currentPos : null);
     cameraSystem.update(dt, elapsed);
     streetDetails.signalClock.value = elapsed;
@@ -769,6 +780,7 @@ async function initApp() {
     lightingSystem.update(cameraSystem.currentPos);
     colorGrade.update();
     cityContracts.update(worldDt, elapsed);
+    streetPlay.update(worldDt);
     mapSystem.update();
     audioSystem.update(dt, elapsed, cameraSystem.camera, lightingSystem.activePresetId === 'midnight');
     if (warmedUp) updateSceneCulling(cameraSystem.camera.position); // the warm-up frame draws every chunk
