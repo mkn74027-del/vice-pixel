@@ -1,4 +1,6 @@
 import * as THREE from 'three/webgpu';
+import { Ragdoll, RAGDOLL_POINTS } from './ragdoll.js';
+import { PRONE_RISE, SUPINE_RISE, RISE_BLEND } from './pedestrians.js';
 
 const names={taxi:'Taxi',sedan:'Limousine',suv:'SUV',pickup:'Pickup',minivan:'Minivan',van:'Lieferwagen'};
 const yawOf=v=>v.yaw+(v.yawOffset||0);
@@ -69,6 +71,7 @@ export function createStreetRides({manager,traffic,selectMode,camera,scene,audio
   }
   function leaving(mode){
     if(pull&&mode!=='person')cancelPull();
+    if(mode!=='person')person.playerFall=null;
     if(manager.activeMode!=='car'||mode==='car')return;
     const c=manager.entities.car,side=(driven?.halfWidth||.95)+1.45;
     if(mode==='person')standAt(c.position.x+Math.cos(c.heading)*side,c.position.z-Math.sin(c.heading)*side,c.heading);
@@ -85,8 +88,44 @@ export function createStreetRides({manager,traffic,selectMode,camera,scene,audio
     else v.streetBusy=false;
     person.streetPull=false;person.rig.streetReach=0;door.visible=false;pull=null;
   }
+  const ground=(_,x,z)=>manager.getGroundHeight(x,z,'person');
+  const fallWorld={ground:(x,z)=>ground(null,x,z),colliders:(x,z,r)=>manager.nearColliders(x,z,r),
+    contact:(col,x,y,z,r,out)=>manager.sphereContact(col,x,y,z,r,out)};
+  const posePoints=new Float64Array(51), bindPoints=new Float64Array(51);
+  function tumblePlayer(yaw){
+    const rig=person.rig, p=person.position;
+    rig.reset(p.x,p.z,yaw,ground,person);
+    rig.ragdollPoints(posePoints);
+    const rag=person.streetRagdoll||(person.streetRagdoll=new Ragdoll());
+    const dx=Math.cos(yaw),dz=-Math.sin(yaw);
+    rag.start(posePoints,rig.ragdollBind(bindPoints),rig.s,dx*1.35,.25,dz*1.35);
+    rag.kick(dx*2.9,dz*2.9,3.2);
+    person.playerFall={rag,time:0,rise:null};manager.resetInput();
+  }
+  function animatePlayerFall(dt){
+    const f=person.playerFall;if(!f)return;
+    const rig=person.rig,pos=person.position;f.time+=dt;
+    if(!f.rise){
+      f.rag.step(dt,fallWorld,[]);
+      pos.x=f.rag.pelvisX;pos.z=f.rag.pelvisZ;pos.y=ground(null,pos.x,pos.z);
+      rig.fromRagdoll(f.rag.x);
+      if(f.time>1.65||(f.time>.66&&f.rag.asleep)){
+        const k=RAGDOLL_POINTS.NECK*3,a=f.rag.x;
+        const sign=f.rag.prone?1:-1;
+        f.yaw=Math.atan2((a[k]-pos.x)*sign,(a[k+2]-pos.z)*sign);
+        f.pose=rig.pose.slice();f.rise=f.rag.prone?PRONE_RISE:SUPINE_RISE;f.time=0;
+      }
+    }else if(f.time<f.rise.duration){
+      rig.rise(f.time,pos.x,pos.z,f.yaw,pos.y,f.rise);
+      if(f.time<RISE_BLEND)rig.blendPose(f.pose,1-f.time/RISE_BLEND);
+    }else{
+      person.playerFall=null;person.heading=f.yaw;
+      rig.reset(pos.x,pos.z,f.yaw,ground,person);
+    }
+    person.crowd.begin();person.crowd.add(rig,0);person.crowd.end();
+  }
   function interact(){
-    if(pull||person.streetStun>0)return;
+    if(pull||person.playerFall||(manager.activeMode==='person'&&person.streetStun>0))return;
     if(manager.activeMode==='car'){
       if(Math.abs(manager.entities.car.speed)>3){notice('Zum Aussteigen abbremsen.');return;}
       selectMode('person');camera.resetForTeleport();return;
@@ -98,7 +137,16 @@ export function createStreetRides({manager,traffic,selectMode,camera,scene,audio
     const seat=beside(v,v.halfWidth*.54),p=traffic.startDriver(v,seat.x,seat.z,yawOf(v));
     if(!p){notice('Hier ist gerade zu viel los.');return;}
     traffic.holdStreetCar(v);v.streetOwner=p;
-    pull={p,v,time:0,startX:person.position.x,startZ:person.position.z};
+    const yaw=yawOf(v),dx=person.position.x-v.x,dz=person.position.z-v.z;
+    const wrongSide=dx*Math.cos(yaw)-dz*Math.sin(yaw)<0;
+    const around=(dx*Math.sin(yaw)+dz*Math.cos(yaw)>=0?1:-1)*(v.half+.78);
+    const end=beside(v,v.halfWidth+.6);
+    const path=[{x:person.position.x,z:person.position.z}];
+    if(wrongSide)path.push(beside(v,-v.halfWidth-.48,around),beside(v,v.halfWidth+.48,around));
+    path.push(end);
+    let length=0;
+    for(let i=1;i<path.length;i++){length+=Math.hypot(path[i].x-path[i-1].x,path[i].z-path[i-1].z);path[i].distance=length;}
+    pull={p,v,time:0,path,length,approach:Math.max(.20,length/5.8)};
     person.streetPull=true;manager.resetInput();
     paint.color.setRGB(...v.paint);door.visible=true;
     const a=beside(v,v.halfWidth,.83);
@@ -106,12 +154,21 @@ export function createStreetRides({manager,traffic,selectMode,camera,scene,audio
     bar.hidden=true;
   }
   function animatePull(dt){
-    const t=pull.time+=dt,{p,v}=pull,side=v.halfWidth;
-    const spot=beside(v,side+.6);
-    const ease=Math.min(1,t/.32);
-    person.position.x=pull.startX+(spot.x-pull.startX)*ease;
-    person.position.z=pull.startZ+(spot.z-pull.startZ)*ease;
-    person.heading=yawOf(v)-Math.PI/2;
+    pull.time+=dt;
+    const {p,v,path,length,approach}=pull,side=v.halfWidth;
+    const t=pull.time-approach;
+    if(t<0){
+      const dist=length*pull.time/approach;
+      let i=1;while(i<path.length-1&&path[i].distance<dist)i++;
+      const a=path[i-1],b=path[i],start=a.distance||0;
+      const f=Math.min(1,(dist-start)/Math.max(.001,b.distance-start));
+      person.position.x=a.x+(b.x-a.x)*f;person.position.z=a.z+(b.z-a.z)*f;
+      person.position.y=ground(null,person.position.x,person.position.z);
+      person.heading=Math.atan2(b.x-a.x,b.z-a.z);hinge.rotation.y=0;door.visible=false;return;
+    }
+    door.visible=true;
+    const spot=path[path.length-1];
+    person.position.x=spot.x;person.position.z=spot.z;person.heading=yawOf(v)-Math.PI/2;
     person.rig.streetReach=Math.sin(Math.PI*Math.min(1,t/1.15));
     hinge.rotation.y=-1.03*Math.min(1,t/.3,(1.48-t)/.36);
     door.updateMatrixWorld();
@@ -123,7 +180,7 @@ export function createStreetRides({manager,traffic,selectMode,camera,scene,audio
     if(t>=1.48){door.visible=false;pull=null;person.rig.streetReach=0;board(v);}
   }
   function ownerMoves(p,dt){
-    if(!p.placed||p.phase==='pull')return;
+    if(!p.placed||p.phase==='pull'||pull?.p===p)return;
     const v=p.car,c=manager.getActiveEntity(),distPlayer=Math.hypot(c.position.x-p.x,c.position.z-p.z);
     p.age+=dt;
     if(distPlayer>85 || (p.age>55&&distPlayer>22)){p.placed=false;return;}
@@ -165,7 +222,7 @@ export function createStreetRides({manager,traffic,selectMode,camera,scene,audio
     p.reach+=dt;p.rig.streetPunch=Math.max(p.rig.streetPunch,.55);
     if(inOwnCar&&p.reach>0&&p.reach<=dt)notice('Der Fahrer greift nach der Tür!');
     if(p.reach<(inOwnCar?1.45:.85))return;
-    if(inOwnCar){selectMode('person');camera.resetForTeleport();person.streetStun=.65;flash();}
+    if(inOwnCar){selectMode('person');camera.resetForTeleport();tumblePlayer(v.yaw);flash();}
     if(traffic.returnStreetCar(v)){p.placed=false;v.streetOwner=null;notice('Der Fahrer hat seinen Wagen zurück.');}
     else {p.phase='flee';p.reach=0;}
   }
@@ -183,6 +240,7 @@ export function createStreetRides({manager,traffic,selectMode,camera,scene,audio
   return {interact,leaving,initialize,get busy(){return !!pull;},update(dt){
     if(!dt)return;
     if(pull)animatePull(dt);
+    animatePlayerFall(dt);
     for(const p of traffic.drivers)ownerMoves(p,dt);
     if(noticeTime>0){noticeTime-=dt;if(noticeTime<=0)toast.hidden=true;}
     if((sample-=dt)>0)return;sample=.12;

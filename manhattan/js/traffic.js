@@ -1,6 +1,6 @@
 import * as THREE from 'three/webgpu';
 import { buildRoadNetwork } from './road-network.js';
-import { createPedestrianSystem } from './pedestrian-system.js?v=street5';
+import { createPedestrianSystem } from './pedestrian-system.js?v=rides51';
 import { vehicleContact, resolveVehicleContact, sweptVehicleContact } from './vehicle-physics.js';
 import { createMover, vehicleShape } from './ragdoll.js';
 import { signalPhase, walkSignal } from './city-config.js';

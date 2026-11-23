@@ -1039,7 +1039,7 @@ class ThirdPersonControllerManager {
     const maxDistSq = 320 * 320;
 
     const p = this.entities.person;
-    if (p) {
+    if (p && !p.playerFall) {
       const dx = focus ? p.position.x - focus.x : 0;
       const dz = focus ? p.position.z - focus.z : 0;
       if (!p.inVehicle && (this.activeMode === 'person' || dx * dx + dz * dz <= maxDistSq)) {
@@ -1171,7 +1171,7 @@ class ThirdPersonControllerManager {
   updatePerson(dt) {
     if (dt <= 0) return;
     const p = this.entities.person;
-    if(p.streetPull || p.streetStun>0){
+    if(p.streetPull || p.playerFall || p.streetStun>0){
       p.streetStun=Math.max(0,(p.streetStun||0)-dt);p.walkVX=p.walkVZ=p.speed=0;return;
     }
     const view = this.walkViewYaw ?? p.heading;

@@ -1,6 +1,6 @@
 import * as THREE from 'three/webgpu';
 import { RAGDOLL_POINTS } from './ragdoll.js';
-import { createImpactEffects } from './street-effects.js?v=street5';
+import { createImpactEffects } from './street-effects.js?v=rides51';
 
 const gear=[
   {name:'Fäuste',mag:0,interval:.44},
@@ -15,7 +15,7 @@ export function createStreetPlay({scene,manager,cameraSystem,traffic,audio,map,c
   const blood=document.getElementById('street-blood'), message=document.getElementById('street-notice');
   const locks=()=>document.pointerLockElement===canvas;
   const person=manager.entities.person;
-  const ready=()=>manager.activeMode==='person'&&!map.isFullMapOpen&&!panel.open&&!manager.inputBlocked&&!person.streetPull&&!(person.streetStun>0)&&audio.ready&&!document.querySelector('.vice-missions.jobs-open')&&cameraSystem.getActivePreset().category==='follow';
+  const ready=()=>manager.activeMode==='person'&&!map.isFullMapOpen&&!panel.open&&!manager.inputBlocked&&!person.streetPull&&!person.playerFall&&!(person.streetStun>0)&&audio.ready&&!document.querySelector('.vice-missions.jobs-open')&&cameraSystem.getActivePreset().category==='follow';
   const eyeRay=new THREE.Raycaster(), pointer=new THREE.Vector2(), impact=new THREE.Vector3();
   const muzzle=new THREE.Vector3(), aim=new THREE.Vector3(), lineDir=new THREE.Vector3();
   const handPoints=new Float32Array(51), touch={};

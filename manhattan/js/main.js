@@ -1,6 +1,6 @@
-import { createStreetRides } from './street-rides.js?v=street5';
-import { createStreetPlay } from './street-play.js?v=street5';
-import { createCityContracts } from './vice-contracts.js?v=street5';
+import { createStreetRides } from './street-rides.js?v=rides51';
+import { createStreetPlay } from './street-play.js?v=rides51';
+import { createCityContracts } from './vice-contracts.js?v=rides51';
 import { createNavigator } from './vice-gps.js';
 import * as THREE from 'three/webgpu';
 import { pass, mrt, output, normalView, positionView, metalness, roughness, vec2, smoothstep } from 'three/tsl';
@@ -18,7 +18,7 @@ import { buildCityBlocks } from './buildings.js';
 import { buildStreetDetails } from './street-details.js';
 import { createTrafficSystem, createHighwayTraffic } from './traffic.js';
 import { buildRoadPaint } from './road-paint.js';
-import { ThirdPersonControllerManager } from './controllers.js?v=street5';
+import { ThirdPersonControllerManager } from './controllers.js?v=rides51';
 import { TouchControls } from './touch-controls.js';
 import { GamepadControls } from './gamepad-controls.js';
 import { CameraSystem, CAMERA_PRESETS } from './cameras.js';
