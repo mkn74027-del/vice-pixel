@@ -1,4 +1,4 @@
-import { createCityContracts } from './vice-contracts.js';
+import { createCityContracts } from './vice-contracts.js?v=manhattan-3';
 import { createNavigator } from './vice-gps.js';
 import * as THREE from 'three/webgpu';
 import { pass, mrt, output, normalView, positionView, metalness, roughness, vec2, smoothstep } from 'three/tsl';
@@ -16,12 +16,12 @@ import { buildCityBlocks } from './buildings.js';
 import { buildStreetDetails } from './street-details.js';
 import { createTrafficSystem, createHighwayTraffic } from './traffic.js';
 import { buildRoadPaint } from './road-paint.js';
-import { ThirdPersonControllerManager } from './controllers.js';
+import { ThirdPersonControllerManager } from './controllers.js?v=manhattan-3';
 import { TouchControls } from './touch-controls.js';
 import { GamepadControls } from './gamepad-controls.js';
 import { CameraSystem, CAMERA_PRESETS } from './cameras.js';
 import { LightingSystem } from './lighting.js';
-import { NYCMapSystem } from './nyc-map.js';
+import { NYCMapSystem } from './nyc-map.js?v=manhattan-3';
 import { setupSceneCulling, updateSceneCulling } from './scene-culling.js';
 import { CityAudioSystem } from './audio-system.js';
 
