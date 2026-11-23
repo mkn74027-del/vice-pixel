@@ -17,6 +17,7 @@ import {
   cross,
   normalize,
   atan,
+  sin,
   abs,
   sign,
   dot,
@@ -66,7 +67,10 @@ const BONE_COUNT = 15;
 // vec4s per person in the pose buffer: (quaternion) and (translation, scale) per bone, the appearance (3 vec4s, see
 // personAppearance), then (seed, female, girth, hair)
 const APPEARANCE = BONE_COUNT * 2;
-const STRIDE = APPEARANCE + 4;
+const WOUND_BASE = APPEARANCE + 4;
+const WOUND_COUNT = 3;
+const CUT_BASE = WOUND_BASE + WOUND_COUNT;
+const STRIDE = CUT_BASE + 1;
 
 // Bind pose (metres, a 1.75 m person standing at the origin facing +Z, +X on their left): legs straight down, arms
 // hanging 8 degrees out from the body
@@ -139,6 +143,7 @@ function ragdollBindPoints(female) {
   return out;
 }
 const RAGDOLL_BIND = [ragdollBindPoints(0), ragdollBindPoints(1)];
+let fragmentTemplate=null;
 
 // ============================================================================
 // 2. SKINNED LOFTED BODY GEOMETRY
@@ -880,7 +885,7 @@ function personLook(pose, base) {
 function createPersonMaterial(pose, detail = 1) {
   const mat = new THREE.MeshStandardNodeMaterial({ metalness: 0 });
   const base = int(instanceIndex).mul(STRIDE);
-  const info = pose.element(base.add(STRIDE - 1)); // seed, female, girth, hair
+  const info = pose.element(base.add(APPEARANCE + 3)); // seed, female, girth, hair
   const look = personLook(pose, base);
   const female = info.y;
 
@@ -897,6 +902,15 @@ function createPersonMaterial(pose, detail = 1) {
   const isHead = isPart(PART.HEAD);
   const isHairPart = step(PART.HAIR - 0.5, partId);
 
+  // Cut fragments at the joint, including triangles crossing the seam.
+  const cut=pose.element(base.add(CUT_BASE));
+  const leftSide=step(0.0,posAttr.x);
+  const legCut=mix(step(1.5,cut.w),cut.w.mod(2.0),leftSide);
+  const removeHead=max(isHead,isHairPart).mul(cut.x);
+  const removeArm=mix(cut.z,cut.y,leftSide).mul(max(isArm,isHand))
+    .mul(smoothstep(1.146,1.121,posAttr.y));
+  const removeLeg=legCut.mul(max(isLeg,isShoe)).mul(smoothstep(.519,.486,posAttr.y));
+  mat.maskNode=varying(vertexStage(max(removeHead,max(removeArm,removeLeg))),'vPersonCut').lessThan(.5);
   mat.positionNode = Fn(() => {
     const skin = skinAttr;
     const extra = extraAttr;
@@ -1055,6 +1069,28 @@ function createPersonMaterial(pose, detail = 1) {
   const hemY = fLook.hemY;
   const ndv = clamp(dot(normalView, positionViewDirection), 0.0, 1.0);
 
+  // Ellipsoids are evaluated in bind space, so cloth and skin retain the stain as
+  // joints bend. The outer soak, exposed centre and downward streak have separate masks.
+  const hitField=Fn(()=>{
+    const out=vec3(0).toVar(),start=int(vInstance).mul(STRIDE).add(WOUND_BASE);
+    const first=pose.element(start);
+    If(first.w.greaterThan(0),()=>{
+      const grain=sin(dot(q,vec3(125,81,63))).mul(sin(dot(q,vec3(48,-105,84)))).mul(.085);
+      for(let i=0;i<WOUND_COUNT;i++){
+        const hit=i?pose.element(start.add(i)):first;
+        const d=q.sub(hit.xyz).div(max(.025,hit.w));
+        const jitter=grain.add(sin(d.x.mul(12).add(d.y.mul(7))).mul(.048));
+        const field=length(d.mul(vec3(1.16,.90,1.14))).add(jitter);
+        const wet=float(1).sub(smoothstep(.60,1.09,field));
+        const core=float(1).sub(smoothstep(.21,.46,field));
+        const dripD=vec3(d.x.add(sin(d.y.mul(7)).mul(.044)).mul(3.9),d.y.add(.91).mul(.84),d.z.mul(1.75));
+        const drip=float(1).sub(smoothstep(.36,.68,length(dripD).add(jitter)));
+        const live=step(.001,hit.w);
+        out.assign(max(out,vec3(wet,core,drip).mul(live)));
+      }
+    });
+    return out;
+  })();
   mat.colorNode = Fn(() => {
     const o = outfit();
     // This part's colours (A: top, trousers, shoe upper, skin or hair; B: shirt, skin, sole, cuff or hair), picked
@@ -1292,7 +1328,12 @@ function createPersonMaterial(pose, detail = 1) {
     // Light scattered under the skin comes back out redder than its surface: warm the face & hands a little, so cool
     // sky light doesn't leave them grey
     const warm = mix(vec3(1.0), vec3(1.07, 0.97, 0.9), fSkin);
-    return outCol.mul(warm).mul(sheen.add(1.0)).mul(occlusion.mul(0.45).add(0.55));
+    const surface=outCol.mul(warm).mul(sheen.add(1.0)).mul(occlusion.mul(0.45).add(0.55));
+    const absorbed=mix(surface.mul(.30),color(0x741628),.73);
+    const soaked=mix(surface,absorbed,max(hitField.x,hitField.z.mul(.83)));
+    const rim=hitField.x.mul(float(1).sub(hitField.y)).mul(.29);
+    const tissue=mix(color(0x33090f),color(0x9b3040),sin(dot(q,vec3(108,42,76))).mul(.24).add(.41));
+    return mix(mix(soaked,color(0xa32633),rim),tissue,hitField.y);
   })();
 
   mat.aoNode = occlusion;
@@ -1304,6 +1345,7 @@ function createPersonMaterial(pose, detail = 1) {
     isPartF(pId, PART.SHOE).mul(float(1.0).sub(fLook.sneaker))
   );
 
+  mat.roughnessNode=mix(mat.roughnessNode,float(.29),max(hitField.x,hitField.z.mul(.55)));
   return mat;
 }
 
@@ -1343,11 +1385,10 @@ class PersonCrowd {
     if (l.count >= l.max) return;
     const offset=l.count * STRIDE * 4;
     l.pose.value.array.set(rig.pose, offset);
-    // Alter only the rendered costume. The original joint pose still drives contact and recovery.
-    if(rig.streetWounds){
-      for(let bone=0;bone<BONE_COUNT;bone++)if(rig.streetWounds & (1<<bone))
-        l.pose.value.array[offset+bone*8+7]=.001;
-    }
+    if(rig.hitMarks)l.pose.value.array.set(rig.hitMarks,offset+WOUND_BASE*4);
+    const mask=rig.streetWounds||0;
+    if(mask)l.pose.value.array.set([+(!!(mask&4)),+(!!(mask&16)),+(!!(mask&64)),
+      +(!!(mask&256))+2*(!!(mask&4096))],offset+CUT_BASE*4);
     l.count++;
   }
 
@@ -1579,7 +1620,7 @@ class PersonRig {
     this.feet = [makeFoot(1), makeFoot(-1)];
     this.pose = new Float32Array(STRIDE * 4);
     this.pose.set(personAppearance(seed, this.female), APPEARANCE * 4);
-    this.pose.set([seed, this.female, girth, hair], (STRIDE - 1) * 4);
+    this.pose.set([seed, this.female, girth, hair], (APPEARANCE + 3) * 4);
   }
 
   get legLength() {
@@ -2364,6 +2405,63 @@ class PersonRig {
   // Falls: the ragdoll (ragdoll.js) takes over from the pose the person had, gives the bones back from its points, and
   // the person gets up from however it lies
   // ---------------------------------------------------------------------------------------------------------------
+  fragment(kind,joint) {
+    // Cut the original model in the same coordinate system as the skin shader.
+    const template=fragmentTemplate||(fragmentTemplate=buildPersonGeometry(1));
+    const A=template.attributes, skin=A.skin, original=template.index;
+    const bind=RAGDOLL_BIND[this.female][joint], side=bind[1]>=0?1:-1;
+    const pos=[],norm=[],col=[];
+    const appearance=this.pose.subarray(APPEARANCE*4,APPEARANCE*4+12);
+    const topCode=Math.round(appearance[10])%4, girth=this.pose[(APPEARANCE+3)*4+2];
+    const hair=this.pose[(APPEARANCE+3)*4+3];
+    const count=original?.count??A.position.count;
+    const getId=i=>original?original.getX(i):i;
+    for(let i=0;i<count;i+=3){
+      const ids=[getId(i),getId(i+1),getId(i+2)],id=ids[0],part=skin.getW(id);
+      const y=ids.reduce((sum,k)=>sum+A.position.getY(k),0)/3;
+      if(kind==='head'){
+        if(part<PART.HEAD)continue;
+      }else{
+        if(A.position.getX(id)*side<0)continue;
+        if(kind==='leg'?(part!==PART.SHOE&&part!==PART.LEG)||y>.505:
+          (part!==PART.ARM&&part!==PART.HAND)||y>1.134)continue;
+      }
+      for(const k of ids){
+        const long=part===PART.LONG_HAIR,hairFactor=part===PART.HAIR||long?Math.max(0,Math.min(1,hair*2-(long?1:0))):0;
+        pos.push((A.position.getX(k)+A.femaleDelta.getX(k)*this.female+A.extra.getX(k)*(girth-1)+A.hairDelta.getX(k)*hairFactor-bind[1])*this.s,
+          (A.position.getY(k)+A.femaleDelta.getY(k)*this.female+A.hairDelta.getY(k)*hairFactor-bind[2])*this.s,
+          (A.position.getZ(k)+A.femaleDelta.getZ(k)*this.female+A.extra.getY(k)*(girth-1)+A.hairDelta.getZ(k)*hairFactor-bind[3])*this.s);
+        norm.push(A.normal.getX(k),A.normal.getY(k),A.normal.getZ(k));
+        const channel=part>=PART.HAIR?1:part===PART.SHOE?6:part===PART.LEG?(y<appearance[9]?0:4):part===PART.ARM&&topCode!==2?2:0;
+        const packed=appearance[channel];col.push(((packed&255)/255)**2,(((packed>>8)&255)/255)**2,(((packed>>16)&255)/255)**2);
+      }
+    }
+    const g=new THREE.BufferGeometry();
+    g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(norm,3));
+    g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));g.computeBoundingSphere();
+    return g;
+  }
+
+  // Transform the contact into the original unposed mesh. The material can then shade
+  // the same point while animation, ragdoll and recovery move the character.
+  markContact(joint,x,y,z,radius) {
+    const bind=RAGDOLL_BIND[this.female][joint];
+    if(!bind)return;
+    const bone=bind[0]*8, a=this.pose, scale=a[bone+7]||this.s;
+    _q.set(a[bone],a[bone+1],a[bone+2],a[bone+3]).invert();
+    _v.set(x-a[bone+4],y-a[bone+5],z-a[bone+6]).applyQuaternion(_q).multiplyScalar(1/scale);
+    const marks=this.hitMarks||(this.hitMarks=new Float32Array(WOUND_COUNT*4));
+    let slot=this.markCursor||0;
+    for(let i=0;i<WOUND_COUNT;i++){
+      const k=i*4;
+      if(marks[k+3]&&Math.hypot(marks[k]-_v.x,marks[k+1]-_v.y,marks[k+2]-_v.z)<.15){
+        marks[k+3]=Math.min(.39,Math.max(radius,marks[k+3])+.035);return;
+      }
+    }
+    marks.set([_v.x,_v.y,_v.z,radius],slot*4);
+    this.markCursor=(slot+1)%WOUND_COUNT;
+  }
+
   // World positions of the ragdoll's points (COUNT x 3) as the bones stand now
   ragdollPoints(out) {
     const a = this.pose;

@@ -291,7 +291,7 @@ function createPedestrianSystem(network, { player, nearEdges, nearSignals, mayCr
         if (crowded) continue;
       }
       if (p.conversation) endConversation(p.conversation);
-      p.streetGeneration=(p.streetGeneration||0)+1;p.rig.streetWounds=0;p.streetInjury=0;p.rig.streetLostArm=0;
+      p.streetGeneration=(p.streetGeneration||0)+1;p.rig.streetWounds=0;p.rig.hitMarks=null;p.rig.markCursor=0;p.zoneTrauma=null;p.streetInjury=0;p.rig.streetLostArm=0;
       Object.assign(p, track);
       p.t = t;
       p.dir = t < track.len * 0.5 ? 1 : -1;
@@ -1135,7 +1135,7 @@ function createPedestrianSystem(network, { player, nearEdges, nearSignals, mayCr
     if(!p)return null;
     Object.assign(p,{x,z,placed:true,car:v,phase:'pull',fall:null,heading:yaw,downTime:0,reach:0,
       timer:0,fight:Math.random()<.48,angry:false,hitDelay:0,age:0,streetInjury:0});
-    p.streetGeneration=(p.streetGeneration||0)+1;p.rig.streetWounds=0;p.rig.streetLostArm=0;p.rig.streetPunch=0;
+    p.streetGeneration=(p.streetGeneration||0)+1;p.rig.streetWounds=0;p.rig.hitMarks=null;p.rig.markCursor=0;p.zoneTrauma=null;p.rig.streetLostArm=0;p.rig.streetPunch=0;
     p.rig.reset(x,z,yaw,worldGround,p);return p;
   }
   function dropDriver(p,dx,dz){

@@ -1,7 +1,7 @@
 import {applyImpact,vehicleRay} from './car-damage.js';
 import * as THREE from 'three/webgpu';
 import { RAGDOLL_POINTS } from './ragdoll.js';
-import { createImpactEffects } from './street-effects.js?v=impact64';
+import { createImpactEffects } from './street-effects.js?v=motion72';
 
 const gear=[
   {name:'Fäuste',mag:0,interval:.44},
@@ -89,7 +89,7 @@ export function createStreetPlay({law,scene,manager,cameraSystem,traffic,audio,m
   });
   blood.addEventListener('change',()=>{
     const level=Number(blood.value);effects.setLevel(level);
-    if(level<2){tires.clear();for(const p of traffic.streetTargets)p.rig.streetWounds=0;}
+    if(level<2){tires.clear();for(const p of traffic.streetTargets){p.rig.streetWounds=0;p.rig.hitMarks=null;p.rig.markCursor=0;p.zoneTrauma=null;}}
   });
   document.getElementById('street-look').addEventListener('click',()=>{
     menu(false);selectMode('person');
@@ -105,25 +105,30 @@ export function createStreetPlay({law,scene,manager,cameraSystem,traffic,audio,m
   function recharge(){
     if(index && !reload && ammo[index]<gear[index].mag){reload=index===1?.85:1.15;firing=false;refresh();}
   }
-  function react(p,x,y,z,dx,dz,heavy,zone,contact=false){
+  function react(p,x,y,z,dx,dz,heavy,zone,contact=false,severity=1){
     const last=impacted.get(p);
     const recent=last?.generation===p.streetGeneration&&clock-last.at<.80;
     if(contact&&recent)return;
     if(!recent)impacted.set(p,{at:clock,generation:p.streetGeneration});
     effects.burst(x,y,z,dx,dz,heavy);
+    if(heavy&&blood.value==='2')effects.wallSplash(x,y,z,dx,dz,manager);
     if(heavy&&blood.value==='2'&&p.ragdoll&&zone){
       const j=zone.base*3,pos=p.ragdoll.x;
+      p.rig.markContact(zone.joint,x,y,z,contact?.27:.21);
       effects.wound(p,zone.base);
-      if(zone.mask&&!(p.rig.streetWounds&zone.mask)){
+      const damage=p.zoneTrauma||(p.zoneTrauma=new Float32Array(17));
+      const group=zone.base;
+      damage[group]+=severity;
+      if(zone.mask&&damage[group]>=1.5&&!(p.rig.streetWounds&zone.mask)){
         p.rig.streetWounds=(p.rig.streetWounds||0)|zone.mask;
-        effects.separate(pos[j],pos[j+1],pos[j+2],dx,dz,zone.kind);
+        effects.separate(pos[j],pos[j+1],pos[j+2],dx,dz,zone.kind,p.rig,zone.base);
         if(zone.kind==='head'||zone.kind==='leg')p.streetInjury=1;
       }
     }
     if(!recent&&audio.streetSound('cry',x,y,z))screams++;
     if(recent)return;
     if(trails.length>=16)trails.shift();
-    trails.push({p,x,z,until:clock+3.6});
+    trails.push({p,x,z,generation:p.streetGeneration,until:clock+7});
   }
   traffic.setPersonImpactFeedback((p,m,joint,wheel)=>{
     const speed=Math.hypot(m.vx,m.vz),pose=p.ragdoll?.x;
@@ -141,7 +146,7 @@ export function createStreetPlay({law,scene,manager,cameraSystem,traffic,audio,m
         tires.set(v,{x:m.x,z:m.z,side:side<0?-1:1,left:15,until:clock+30});}
     }
     const k=zone.joint*3;
-    react(p,pose?.[k]??p.x,pose?.[k+1]??ground(p.x,p.z)+.8,pose?.[k+2]??p.z,m.vx,m.vz,speed>5,zone,true);
+    react(p,pose?.[k]??p.x,pose?.[k+1]??ground(p.x,p.z)+.8,pose?.[k+2]??p.z,m.vx,m.vz,speed>5,zone,true,wheel?1.8:Math.min(2.2,speed/8));
   });
   function unobstructed(origin,dir,range){
     const endX=origin.x+dir.x*range,endZ=origin.z+dir.z*range;
@@ -258,7 +263,7 @@ export function createStreetPlay({law,scene,manager,cameraSystem,traffic,audio,m
   return {get menuOpen(){return panel.open;}, stopInput,
     update(dt){
       clock+=dt;
-      const active=manager.activeMode==='person';
+      const active=manager.activeMode==='person'&&!person.playerFall;
       if (inputActive && !active) { firing=false; punch=0; pendingPunch=false; }
       inputActive=active;
       if(!active||panel.open||map.isFullMapOpen){firing=false;pendingPunch=false;}
@@ -281,8 +286,10 @@ export function createStreetPlay({law,scene,manager,cameraSystem,traffic,audio,m
       }
       for(let i=trails.length-1;i>=0;i--){
         const t=trails[i],p=t.p;
-        if(clock>t.until||!p.placed||!p.fall){trails.splice(i,1);continue;}
-        if(Math.hypot(p.x-t.x,p.z-t.z)>.58){effects.trail(p.x,p.z);t.x=p.x;t.z=p.z;}
+        if(clock>t.until||!p.placed||p.streetGeneration!==t.generation||!p.fall){trails.splice(i,1);continue;}
+        const travel=Math.hypot(p.x-t.x,p.z-t.z);
+        const low=p.ragdoll&&p.ragdoll.pelvisY-ground(p.x,p.z)<.66;
+        if(travel>.22){if(low&&travel<4)effects.trail(t.x,t.z,p.x,p.z);t.x=p.x;t.z=p.z;}
       }
       if(dt>0){
         for(const [v,t] of tires){

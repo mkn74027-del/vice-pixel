@@ -1235,13 +1235,12 @@ class ThirdPersonControllerManager {
     }
   }
 
-  updateCar(dt) {
+  updateCar(dt, c = this.entities.car, driver = true) {
     if (dt <= 0) return;
-    const c = this.entities.car;
 
     let throttle = 0;
-    if (this.keys.forward) throttle = this.keys.forward;
-    else if (this.keys.backward) throttle = -this.keys.backward;
+    if (driver && this.keys.forward) throttle = this.keys.forward;
+    else if (driver && this.keys.backward) throttle = -this.keys.backward;
 
     const damage=(c.trafficCar||c).crush;
     const engine=damage?Math.max(damage[0],damage[1]):0;
@@ -1249,8 +1248,8 @@ class ThirdPersonControllerManager {
     if(!braking)throttle*=1-.56*engine;
 
     let steerInput = 0;
-    if (this.keys.left) steerInput = this.keys.left;
-    if (this.keys.right) steerInput = -this.keys.right;
+    if (driver && this.keys.left) steerInput = this.keys.left;
+    if (driver && this.keys.right) steerInput = -this.keys.right;
 
     if(damage)steerInput+=Math.min(1,Math.abs(c.speed)/14)*(damage[0]-damage[1])*.13;
     const prevX = c.position.x;

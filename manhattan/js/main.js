@@ -1,7 +1,7 @@
 import {createDispatch} from './dispatch.js';
-import { createStreetRides } from './street-rides.js?v=impact64';
-import { createStreetPlay } from './street-play.js?v=impact64';
-import { createCityContracts } from './vice-contracts.js?v=impact64';
+import { createStreetRides } from './street-rides.js?v=motion72';
+import { createStreetPlay } from './street-play.js?v=motion72';
+import { createCityContracts } from './vice-contracts.js?v=motion72';
 import { createNavigator } from './vice-gps.js';
 import * as THREE from 'three/webgpu';
 import { pass, mrt, output, normalView, positionView, metalness, roughness, vec2, smoothstep } from 'three/tsl';
@@ -19,7 +19,7 @@ import { buildCityBlocks } from './buildings.js';
 import { buildStreetDetails } from './street-details.js';
 import { createTrafficSystem, createHighwayTraffic } from './traffic.js';
 import { buildRoadPaint } from './road-paint.js';
-import { ThirdPersonControllerManager } from './controllers.js?v=impact64';
+import { ThirdPersonControllerManager } from './controllers.js?v=motion72';
 import { TouchControls } from './touch-controls.js';
 import { GamepadControls } from './gamepad-controls.js';
 import { CameraSystem, CAMERA_PRESETS } from './cameras.js';
@@ -362,7 +362,7 @@ async function initApp() {
   }
 
   let streetRides=null;
-  function selectMode(mode) {
+  function selectMode(mode, movingExit=false) {
     const previousMode = controllerManager.activeMode;
     streetRides?.leaving(mode);
     controllerManager.setMode(mode);
@@ -370,7 +370,7 @@ async function initApp() {
       if (mode === 'person') cameraSystem.walkYaw=controllerManager.entities.person.heading;
       if (document.pointerLockElement) document.exitPointerLock();
       controllerManager.resetInput();
-      cameraSystem.setCameraPreset('chase',true);
+      cameraSystem.setCameraPreset('chase',!movingExit);
     }
     touchControls.setMode(controllerManager.activeMode);
     gamepadControls.reset();
@@ -769,6 +769,7 @@ async function initApp() {
     if (!streetPlay.menuOpen) gamepadControls.update(worldDt);
     controllerManager.walkViewYaw = cameraSystem.walkYaw;
     if (worldDt > 0) controllerManager.update(worldDt, elapsed, cameraSystem.initialized ? cameraSystem.currentPos : null);
+    if(worldDt>0)streetRides.advanceRoll(worldDt);
     cameraSystem.update(dt, elapsed);
     streetDetails.signalClock.value = elapsed;
     if (worldDt > 0) trafficSystem.update(

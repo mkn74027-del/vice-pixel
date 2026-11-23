@@ -1,7 +1,7 @@
 import {applyImpact} from './car-damage.js';
 import * as THREE from 'three/webgpu';
 import { buildRoadNetwork } from './road-network.js';
-import { createPedestrianSystem } from './pedestrian-system.js?v=impact64';
+import { createPedestrianSystem } from './pedestrian-system.js?v=motion72';
 import { vehicleContact, resolveVehicleContact, sweptVehicleContact } from './vehicle-physics.js';
 import { createMover, vehicleShape } from './ragdoll.js';
 import { signalPhase, walkSignal } from './city-config.js';
@@ -533,6 +533,7 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
     }
     return shapes[kind];
   }
+  const rollingCars = new Set();
   let playerMover = null;
   function gatherMovers(dt, playerEntity, activeMode) {
     let n = 0;
@@ -545,21 +546,19 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
       return m;
     };
     playerMover = null;
-    if (player.active && activeMode === 'car' && playerEntity.chassisPivot) {
-      const m = playerMover = take();
-      const chassis = playerEntity.chassisPivot;
-      m.x = player.x; m.z = player.z; m.y = playerEntity.position.y + chassis.position.y;
-      m.heading = playerEntity.heading || 0;
-      m.vx = player.vx; m.vz = player.vz;
-      m.yawRate = playerEntity.angularVel || 0;
-      m.pitch = chassis.rotation.x; m.roll = chassis.rotation.z;
-      m.shape = shapeOf(playerEntity.trafficCar?.bodyType || 'taxi');
-      m.mass = playerEntity.trafficCar?.mass || 1700;
-      m.ref = playerEntity;
-      m.knocks = true;
+    function carMover(entity) {
+      const m=take(), chassis=entity.chassisPivot, yaw=entity.heading;
+      m.x=entity.position.x; m.z=entity.position.z; m.y=entity.position.y+chassis.position.y;
+      m.heading=yaw;
+      m.vx=Math.sin(yaw)*entity.speed+entity.vx; m.vz=Math.cos(yaw)*entity.speed+entity.vz;
+      m.yawRate=entity.angularVel; m.pitch=chassis.rotation.x; m.roll=chassis.rotation.z;
+      m.shape=shapeOf(entity.trafficCar?.bodyType||'taxi'); m.mass=entity.trafficCar?.mass||1700;
+      m.ref=entity; m.knocks=true; return m;
     }
+    if(player.active&&activeMode==='car'&&playerEntity.chassisPivot)playerMover=carMover(playerEntity);
+    for(const c of rollingCars)if(c!==playerEntity&&Math.hypot(c.position.x-focusX,c.position.z-focusZ)<MOVER_RADIUS)carMover(c);
     for (const v of vehicles) {
-      if ((!v.edge && (!v.streetHeld || v.streetController)) || Math.abs(v.x - focusX) > MOVER_RADIUS || Math.abs(v.z - focusZ) > MOVER_RADIUS) continue;
+      if (v.streetRoll || (!v.edge && (!v.streetHeld || v.streetController)) || Math.abs(v.x - focusX) > MOVER_RADIUS || Math.abs(v.z - focusZ) > MOVER_RADIUS) continue;
       const m = take();
       const heading = v.yaw + v.yawOffset;
       m.x = v.x; m.z = v.z; m.y = 0;
@@ -1785,9 +1784,8 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
 
   // The player (its car, bike or self) against traffic vehicle v: kept apart (the player taking the share v can't, held
   // by its path and the curb), momentum exchanged
-  function collideWithPlayer(v) {
-    const pe = player.entity;
-    const reach = v.half + player.halfL + player.halfW;
+  function collideWithPlayer(v, pe=player.entity, halfW=player.halfW, halfL=player.halfL) {
+    const reach = v.half + halfL + halfW;
     const prevX = pe.prevX ?? pe.position.x, prevZ = pe.prevZ ?? pe.position.z;
     const dx = pe.position.x - prevX - v.x + v.prevX;
     const dz = pe.position.z - prevZ - v.z + v.prevZ;
@@ -1798,7 +1796,7 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
     a.x = pe.position.x; a.z = pe.position.z;
     a.prevX = prevX; a.prevZ = prevZ;
     a.sin = Math.sin(heading); a.cos = Math.cos(heading);
-    a.halfW = player.halfW; a.halfL = player.halfL;
+    a.halfW = halfW; a.halfL = halfL;
     a.mass = pe.type === 'car' ? 1700 : pe.type === 'cyclist' ? 95 : 80;
     a.vx = a.sin * (pe.speed || 0) + (pe.vx || 0);
     a.vz = a.cos * (pe.speed || 0) + (pe.vz || 0);
@@ -1828,7 +1826,7 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
       pe.rollVel -= (hit.nx * a.cos - hit.nz * a.sin) * kick * 0.2;
       pe.heaveVel += Math.min(0.7, kick * 0.06);
     }
-    if(pe.type==='car'&&v.isPolice&&speed>5.5)patrolImpact?.(speed);
+    if(pe===player.entity&&pe.type==='car'&&v.isPolice&&speed>5.5)patrolImpact?.(speed);
     impact(v, -hit.nx, -hit.nz, hit.impulse / b.mass);
     if (pe.type !== 'person') crunch(pe, v, 0.58, speed);
   }
@@ -2252,7 +2250,7 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
       const v = vehicles[vehicleCursor];
       vehicleCursor = (vehicleCursor + 1) % vehicles.length;
       if (v.streetHeld) {
-        if (!v.streetController && !v.streetBusy && Math.hypot(v.x-focusX,v.z-focusZ)>VEHICLE_RADIUS) v.streetHeld=false;
+        if (!v.streetController && !v.streetRoll && !v.streetBusy && Math.hypot(v.x-focusX,v.z-focusZ)>VEHICLE_RADIUS) v.streetHeld=false;
         else continue;
       }
       const d = v.edge ? Math.hypot(v.x - focusX, v.z - focusZ) : Infinity;
@@ -2287,10 +2285,13 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
     if (player.active) {
       for (const v of vehicles) if (v.edge) collideWithPlayer(v);
     }
+    for(const c of rollingCars){
+      for(const v of vehicles)if(v.edge)collideWithPlayer(v,c,c.trafficCar?.halfWidth||.86,c.trafficCar?.half||2.18);
+    }
     collideTraffic();
     for (const v of vehicles) {
       if (v.streetHeld) {
-        const c=v.streetController;
+        const c=v.streetController||v.streetRoll;
         v.prevX=v.x; v.prevZ=v.z;
         if(c){
           v.x=c.position.x; v.z=c.position.z; v.streetY=c.position.y;
@@ -2362,6 +2363,7 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
   return {
     group,
     update,
+    movers, rollingCars,
     setCollisionListener,
     setPatrolImpact(listener){patrolImpact=listener;},
     updateDispatch(level,x,z){
