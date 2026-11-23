@@ -1,6 +1,6 @@
 import * as THREE from 'three/webgpu';
 import { buildRoadNetwork } from './road-network.js';
-import { createPedestrianSystem } from './pedestrian-system.js?v=street41';
+import { createPedestrianSystem } from './pedestrian-system.js?v=street5';
 import { vehicleContact, resolveVehicleContact, sweptVehicleContact } from './vehicle-physics.js';
 import { createMover, vehicleShape } from './ragdoll.js';
 import { signalPhase, walkSignal } from './city-config.js';
@@ -543,13 +543,13 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
       m.vx = player.vx; m.vz = player.vz;
       m.yawRate = playerEntity.angularVel || 0;
       m.pitch = chassis.rotation.x; m.roll = chassis.rotation.z;
-      m.shape = shapeOf('taxi');
-      m.mass = 1700;
+      m.shape = shapeOf(playerEntity.trafficCar?.bodyType || 'taxi');
+      m.mass = playerEntity.trafficCar?.mass || 1700;
       m.ref = playerEntity;
       m.knocks = true;
     }
     for (const v of vehicles) {
-      if (!v.edge || Math.abs(v.x - focusX) > MOVER_RADIUS || Math.abs(v.z - focusZ) > MOVER_RADIUS) continue;
+      if ((!v.edge && (!v.streetHeld || v.streetController)) || Math.abs(v.x - focusX) > MOVER_RADIUS || Math.abs(v.z - focusZ) > MOVER_RADIUS) continue;
       const m = take();
       const heading = v.yaw + v.yawOffset;
       m.x = v.x; m.z = v.z; m.y = 0;
@@ -1499,7 +1499,19 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
     v.move = chooseMove(v, false);
   }
 
+  const parkedThisFrame=[];
   function drive(v, dt) {
+    if(v.streetWait>clock){v.speed=v.acc=0;return;}
+    for(const parked of parkedThisFrame){
+      const dx=parked.x-v.x,dz=parked.z-v.z;
+      if(Math.abs(dx)>17 || Math.abs(dz)>17)continue;
+      const ahead=dx*v.tx+dz*v.tz,side=Math.abs(dx*v.tz-dz*v.tx);
+      const gap=ahead-v.half-parked.half;
+      if(ahead>0 && side<v.halfWidth+parked.halfWidth && gap<Math.max(2, v.speed*v.speed/8+2)){
+        v.speed=Math.max(0,Math.min(v.speed,Math.sqrt(Math.max(0,gap-.8)*6))-dt*4.5);
+        if(gap<1.2){v.speed=0;v.acc=0;return;}
+      }
+    }
     v.laneTimer -= dt;
     if (v.laneTimer <= 0) {
       v.laneTimer = 0.4 + Math.random() * 0.3;
@@ -1839,6 +1851,7 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
   }
 
   function place(v, e, lane, s) {
+    v.streetWait=0; v.streetHeld=false; v.streetController=null; v.streetBusy=false; v.streetY=0; v.streetEmpty=false;
     v.edge = e;
     v.lane = lane;
     v.s = s;
@@ -1863,6 +1876,21 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
     occupy(e.occ[lane], v, s);
   }
 
+  function nearestTrafficLane(x,z,yaw) {
+    let best=null,rank=Infinity;
+    for(const e of (nearEdges.length?nearEdges:edges)){
+      if(e.len<10)continue;
+      const along=clamp((x-e.sx)*e.dx+(z-e.sz)*e.dz,3,e.len-3);
+      const facing=yaw===null?0:2*(1-e.dx*Math.sin(yaw)-e.dz*Math.cos(yaw));
+      for(let lane=0;lane<e.lanes.length;lane++){
+        const lx=e.sx+e.dx*along+e.rx*e.lanes[lane],lz=e.sz+e.dz*along+e.rz*e.lanes[lane];
+        const distance=Math.hypot(x-lx,z-lz);
+        if(distance+facing>=rank)continue;
+        rank=distance+facing;best={e,lane,s:along,distance};
+      }
+    }
+    return best;
+  }
   // Put v in a free lane around the focus. Normal replenishment protects the near view; teleports can fill it.
   function spawnVehicle(v, rMin, rMax, protectView) {
     for (let attempt = 0; attempt < 12; attempt++) {
@@ -1921,11 +1949,11 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
     for (let w = 0; w < 2; w++) {
       const wz = w === 0 ? halfBase : -halfBase;
       dummy.rotation.set(v.wheelSpin + w * 0.55, rotY + (w === 0 ? v.steer : 0), roll, 'YXZ');
-      dummy.position.set(v.x - halfTrack * cosY + wz * sinY, radius, v.z + halfTrack * sinY + wz * cosY);
+      dummy.position.set(v.x - halfTrack * cosY + wz * sinY, radius+(v.streetY||0), v.z + halfTrack * sinY + wz * cosY);
       dummy.updateMatrix();
       leftInst.setMatrixAt(i * 2 + w, dummy.matrix);
 
-      dummy.position.set(v.x + halfTrack * cosY + wz * sinY, radius, v.z - halfTrack * sinY + wz * cosY);
+      dummy.position.set(v.x + halfTrack * cosY + wz * sinY, radius+(v.streetY||0), v.z - halfTrack * sinY + wz * cosY);
       dummy.updateMatrix();
       rightInst.setMatrixAt(i * 2 + w, dummy.matrix);
     }
@@ -1969,7 +1997,7 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
     const bodyInst = near ? bodies[c.bodyType].near : bodies[c.bodyType].far;
     const slot = bodyInst.count++;
 
-    dummy.position.set(c.x, 0.0, c.z);
+    dummy.position.set(c.x, c.streetY || 0, c.z);
     dummy.rotation.set(c.pitch, rotY, c.roll, 'YXZ');
     dummy.scale.set(1, 1, 1);
     dummy.updateMatrix();
@@ -1980,13 +2008,13 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
     }
 
     const L = lampState(c);
-    carAttributes.write(bodyInst, slot, c.paint, L[0], L[1], L[2], c.style);
+    carAttributes.write(bodyInst, slot, c.paint, L[0], L[1], L[2], c.streetEmpty ? c.style+65536 : c.style);
 
     // Soft Under-Car Contact Shadow (AO) stays flat on the asphalt, sized to the body kind
     const visIdx = visibleCars++;
     const [shadowW, shadowL, shadowZ] = bodies[c.bodyType].shadow;
     dummy.rotation.set(0, rotY, 0, 'YXZ');
-    dummy.position.set(c.x + sinY * shadowZ, 0.018, c.z + cosY * shadowZ);
+    dummy.position.set(c.x + sinY * shadowZ, 0.018+(c.streetY||0), c.z + cosY * shadowZ);
     dummy.scale.set(shadowW, 1.0, shadowL);
     dummy.updateMatrix();
     carShadowInst.setMatrixAt(visIdx, dummy.matrix);
@@ -2188,12 +2216,18 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
     for (let scanned = 0; scanned < vehicles.length && budget > 0; scanned++) {
       const v = vehicles[vehicleCursor];
       vehicleCursor = (vehicleCursor + 1) % vehicles.length;
+      if (v.streetHeld) {
+        if (!v.streetController && !v.streetBusy && Math.hypot(v.x-focusX,v.z-focusZ)>VEHICLE_RADIUS) v.streetHeld=false;
+        else continue;
+      }
       const d = v.edge ? Math.hypot(v.x - focusX, v.z - focusZ) : Infinity;
       if (d <= (jump ? NEAR_RADIUS : VEHICLE_RADIUS)) continue;
       budget--;
       spawnVehicle(v, jump ? 0 : 100, NEAR_RADIUS, !jump);
     }
     buildOccupancy();
+    parkedThisFrame.length=0;
+    for(const v of cars)if(v.streetHeld&&!v.streetController)parkedThisFrame.push(v);
     for (const m of bodyMeshes) m.count = 0;
     dirtyWheelStyles = false;
     litVehicleCount = 0;
@@ -2220,7 +2254,15 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
     }
     collideTraffic();
     for (const v of vehicles) {
-      if (!v.edge) continue;
+      if (v.streetHeld) {
+        const c=v.streetController;
+        v.prevX=v.x; v.prevZ=v.z;
+        if(c){
+          v.x=c.position.x; v.z=c.position.z; v.streetY=c.position.y;
+          v.yaw=c.heading; v.pitch=c.chassisPivot.rotation.x; v.roll=c.chassisPivot.rotation.z;
+          v.speed=c.speed; v.steer=c.steerAngle;
+        }
+      } else if (!v.edge) continue;
       if (v.bus) renderBus(v);
       else renderCar(v);
     }
@@ -2286,6 +2328,31 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
     group,
     update,
     setCollisionListener,
+    holdStreetCar(v) {
+      v.edge=null; v.streetHeld=true; v.streetBusy=true; v.streetEmpty=true;
+      v.yaw+=v.yawOffset; v.yawOffset=0; v.speed=v.vx=v.vz=v.acc=v.steer=0;
+    },
+    returnStreetCar(v) {
+      const spot=nearestTrafficLane(v.x,v.z,v.yaw);
+      if (!spot||spot.distance>14) {
+        v.streetEmpty=false;v.streetBusy=false;v.streetController=null;v.speed=0;
+        return true;
+      }
+      const x=v.x,z=v.z;
+      place(v,spot.e,spot.lane,spot.s);
+      v.dl=(z-v.z)*v.tx-(x-v.x)*v.tz;
+      locate(v);v.prevX=v.x;v.prevZ=v.z;v.speed=0;v.shaken=clock+.65;
+      return true;
+    },
+    placeWaitingCar(x,z) {
+      const spot=nearestTrafficLane(x,z,null);
+      const v=cars.find(c=>c.bodyType==='sedan'&&!c.isPolice&&!c.streetHeld);
+      if(!spot||!v||spot.distance>25)return;
+      place(v,spot.e,spot.lane,spot.s);v.speed=0;v.streetWait=clock+90;
+      return v;
+    },
+    drivers:pedestrianSystem.drivers, streetTargets:pedestrianSystem.streetTargets,
+    startDriver:pedestrianSystem.startDriver, dropDriver:pedestrianSystem.dropDriver,
     cars,
     buses,
     peds: pedestrianSystem.peds,

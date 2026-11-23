@@ -1481,3 +1481,9 @@ body.street-ready #street-reticle:not([hidden]){display:block;position:fixed;z-i
 #street-reticle.hit{background:#ffc72b!important}body[data-mode=person].street-ready #canvas-container canvas{cursor:crosshair}
 body.street-ready:has(#fullmap-modal:not(.hidden)) #street-bar,body.street-ready.hud-minimized #street-bar{display:none}
 @media(max-width:620px){body.street-ready:not(.street-full) #minimap-card{width:138px;height:85px}#street-menu{padding:14px}#street-menu dl{grid-template-columns:auto 1fr;font-size:12px}}
+
+#ride-context,#ride-notice{position:fixed;left:50%;transform:translateX(-50%);z-index:15;pointer-events:none;color:#fff;background:rgba(14,21,27,.91);padding:.48rem .9rem;border-radius:.48rem;font:600 .875rem/1.35 system-ui;text-align:center}
+#ride-context{bottom:4%;color:#ffdc76}#ride-notice{bottom:10%}
+body:has(#street-menu[open]) #ride-context,body:has(#street-menu[open]) #ride-notice{display:none}
+body.owner-hit::after{content:'';position:fixed;inset:0;z-index:11;pointer-events:none;animation:owner-strike .32s both}
+@keyframes owner-strike{0%{box-shadow:inset 0 0 6vw #ad323486}100%{box-shadow:inset 0 0 0 transparent}}

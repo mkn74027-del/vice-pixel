@@ -10,7 +10,7 @@ const dollars=n=>'$'+Math.floor(n).toLocaleString('de-DE');
 const clock=s=>Math.floor(Math.max(0,s)/60)+':'+String(Math.floor(Math.max(0,s)%60)).padStart(2,'0');
 function element(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text)e.textContent=text;return e;}
 
-export function createCityContracts({scene,controllerManager:manager,mapSystem,cameraSystem,selectMode}){
+export function createCityContracts({scene,controllerManager:manager,mapSystem,interactVehicle}){
   let balance=0,completed=0,active=null,lastJob=jobs[0],toastTime=0,uiClock=0,spawnProtection=0;
   let previous=null,lastMode=manager.activeMode;
   const best=new Map();
@@ -63,26 +63,10 @@ export function createCityContracts({scene,controllerManager:manager,mapSystem,c
     previous=null;spawnProtection=1;cancel.hidden=false;setPanel(false);setTarget();
     tell(job.name+' gestartet. '+(job.mode==='car'?'Taxi wählen [2]. Am Ziel anhalten.':'Heli wählen [4]. Mit Leertaste steigen.'));
   }
-  function enterExit(){
-    const mode=manager.activeMode;
-    if(mode==='car'){
-      const car=manager.entities.car;
-      if(Math.abs(car.speed)>2.5){tell('Zum Aussteigen zuerst anhalten.');return;}
-      car.speed=car.vx=car.vz=car.angularVel=0;
-      selectMode('person');
-      manager.teleportActiveTo(car.position.x+Math.cos(car.heading)*3.8,car.position.z-Math.sin(car.heading)*3.8,car.heading);
-      cameraSystem.resetForTeleport();previous=null;spawnProtection=1;tell('Ausgestiegen. Mit F steigst du wieder ins Taxi.');
-    }else if(mode==='person'){
-      const car=manager.entities.car,p=manager.entities.person;
-      if(Math.hypot(car.position.x-p.position.x,car.position.z-p.position.z)>9){tell('Gehe näher an dein gelbes Taxi.');return;}
-      selectMode('car');p.mesh.visible=false;p._charHidden=true;cameraSystem.resetForTeleport();previous=null;spawnProtection=1;tell('Eingestiegen. W Gas · S bremsen/rückwärts · A/D lenken.');
-    }else tell('F gilt für dein Taxi. Zum Gehen Taste 1 verwenden.');
-    manager.resetInput();
-  }
   window.addEventListener('keydown',e=>{
     if(manager.inputBlocked||document.getElementById('street-menu')?.open||isTypingInField(e)||e.repeat||e.ctrlKey||e.altKey||e.metaKey)return;
     if(e.code==='KeyJ'){e.preventDefault();setPanel(panel.hidden);}
-    if(e.code==='KeyF'&&!mapSystem.isFullMapOpen){e.preventDefault();enterExit();}
+    if(e.code==='KeyF'&&!mapSystem.isFullMapOpen){e.preventDefault();interactVehicle();previous=null;spawnProtection=1;}
   });
   document.querySelectorAll('[data-teleport]').forEach(b=>b.addEventListener('click',()=>{
     previous=null;spawnProtection=1;

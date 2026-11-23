@@ -1,6 +1,6 @@
 import * as THREE from 'three/webgpu';
 import { RAGDOLL_POINTS } from './ragdoll.js';
-import { createImpactEffects } from './street-effects.js?v=street41';
+import { createImpactEffects } from './street-effects.js?v=street5';
 
 const gear=[
   {name:'Fäuste',mag:0,interval:.44},
@@ -15,11 +15,24 @@ export function createStreetPlay({scene,manager,cameraSystem,traffic,audio,map,c
   const blood=document.getElementById('street-blood'), message=document.getElementById('street-notice');
   const locks=()=>document.pointerLockElement===canvas;
   const person=manager.entities.person;
-  const ready=()=>manager.activeMode==='person'&&!map.isFullMapOpen&&!panel.open&&!manager.inputBlocked&&audio.ready&&!document.querySelector('.vice-missions.jobs-open')&&cameraSystem.getActivePreset().category==='follow';
+  const ready=()=>manager.activeMode==='person'&&!map.isFullMapOpen&&!panel.open&&!manager.inputBlocked&&!person.streetPull&&!(person.streetStun>0)&&audio.ready&&!document.querySelector('.vice-missions.jobs-open')&&cameraSystem.getActivePreset().category==='follow';
   const eyeRay=new THREE.Raycaster(), pointer=new THREE.Vector2(), impact=new THREE.Vector3();
   const muzzle=new THREE.Vector3(), aim=new THREE.Vector3(), lineDir=new THREE.Vector3();
   const handPoints=new Float32Array(51), touch={};
-  const impacted=new WeakMap(), trails=[];
+  const impacted=new WeakMap(), trails=[],shotPose=new Float64Array(51);
+  const J=RAGDOLL_POINTS;
+  const zones=[
+    {joint:J.HEAD,r:.175,kind:'head',mask:1<<2,base:J.NECK},
+    {joint:J.ELBOW_L,r:.15,kind:'arm',mask:1<<4,base:J.ELBOW_L},
+    {joint:J.WRIST_L,r:.13,kind:'arm',mask:1<<4,base:J.ELBOW_L},
+    {joint:J.ELBOW_R,r:.15,kind:'arm',mask:1<<6,base:J.ELBOW_R},
+    {joint:J.WRIST_R,r:.13,kind:'arm',mask:1<<6,base:J.ELBOW_R},
+    {joint:J.KNEE_L,r:.17,kind:'leg',mask:7<<8,base:J.KNEE_L},
+    {joint:J.ANKLE_L,r:.15,kind:'leg',mask:7<<8,base:J.KNEE_L},
+    {joint:J.KNEE_R,r:.17,kind:'leg',mask:7<<12,base:J.KNEE_R},
+    {joint:J.ANKLE_R,r:.15,kind:'leg',mask:7<<12,base:J.KNEE_R},
+    ...[J.SPINE,J.NECK,J.HIP_L,J.HIP_R,J.SHOULDER_L,J.SHOULDER_R].map(joint=>({joint,r:.185,mask:0,base:joint}))
+  ];
   let clock=0, index=0, ammo=[0,12,24], cooldown=0, reload=0, punch=0, punchSide=1, pendingPunch=false;
   let firing=false, noticeTime=0, flashTime=0, lastLabel='', lastHitFlash=0;
   let attacks=0, hits=0, screams=0;
@@ -68,7 +81,7 @@ export function createStreetPlay({scene,manager,cameraSystem,traffic,audio,map,c
   });
   blood.addEventListener('change',()=>{
     const level=Number(blood.value);effects.setLevel(level);
-    if(level<2)for(const p of traffic.peds)p.rig.streetLostArm=0;
+    if(level<2)for(const p of traffic.streetTargets)p.rig.streetWounds=0;
   });
   document.getElementById('street-look').addEventListener('click',()=>{
     menu(false);selectMode('person');
@@ -84,23 +97,36 @@ export function createStreetPlay({scene,manager,cameraSystem,traffic,audio,map,c
   function recharge(){
     if(index && !reload && ammo[index]<gear[index].mag){reload=index===1?.85:1.15;firing=false;refresh();}
   }
-  function react(p,x,y,z,dx,dz,heavy){
-    if(clock-(impacted.get(p)??-100)<.85)return;
-    impacted.set(p,clock);
+  function react(p,x,y,z,dx,dz,heavy,zone,contact=false){
+    const last=impacted.get(p);
+    const recent=last?.generation===p.streetGeneration&&clock-last.at<.80;
+    if(contact&&recent)return;
+    if(!recent)impacted.set(p,{at:clock,generation:p.streetGeneration});
     effects.burst(x,y,z,dx,dz,heavy);
-    if(heavy&&blood.value==='2'&&!p.rig.streetLostArm&&p.ragdoll){
-      const left=Math.random()<.5;
-      const joint=(left?RAGDOLL_POINTS.ELBOW_L:RAGDOLL_POINTS.ELBOW_R)*3;
-      const pos=p.ragdoll.x;
-      p.rig.streetLostArm=left?1:2;
-      effects.separate(pos[joint],pos[joint+1],pos[joint+2],dx,dz);
+    if(heavy&&blood.value==='2'&&p.ragdoll&&zone){
+      const j=zone.base*3,pos=p.ragdoll.x;
+      effects.wound(p,zone.base);
+      if(zone.mask&&!(p.rig.streetWounds&zone.mask)){
+        p.rig.streetWounds=(p.rig.streetWounds||0)|zone.mask;
+        effects.separate(pos[j],pos[j+1],pos[j+2],dx,dz,zone.kind);
+        if(zone.kind==='head'||zone.kind==='leg')p.streetInjury=1;
+      }
     }
-    if(audio.streetSound('cry',x,y,z))screams++;
+    if(!recent&&audio.streetSound('cry',x,y,z))screams++;
+    if(recent)return;
     if(trails.length>=16)trails.shift();
-    trails.push({p,x,z,until:clock+2.4});
+    trails.push({p,x,z,until:clock+3.6});
   }
   traffic.setPersonImpactFeedback((p,m)=>{
-    react(p,p.x,ground(p.x,p.z)+.95,p.z,m.vx,m.vz,Math.hypot(m.vx,m.vz)>5);
+    const speed=Math.hypot(m.vx,m.vz),pose=p.ragdoll?.x;
+    let zone=zones[9],best=Infinity;
+    if(pose)for(const candidate of zones){
+      const k=candidate.joint*3;
+      const d=(pose[k]-m.x)**2+(pose[k+1]-(m.y+.58))**2+(pose[k+2]-m.z)**2;
+      if(d<best){zone=candidate;best=d;}
+    }
+    const k=zone.joint*3;
+    react(p,pose?.[k]??p.x,pose?.[k+1]??ground(p.x,p.z)+.8,pose?.[k+2]??p.z,m.vx,m.vz,speed>5,zone,true);
   });
   function unobstructed(origin,dir,range){
     const endX=origin.x+dir.x*range,endZ=origin.z+dir.z*range;
@@ -114,15 +140,17 @@ export function createStreetPlay({scene,manager,cameraSystem,traffic,audio,map,c
     }
     return range;
   }
-  function down(p,dir,heavy=true){
-    if(!traffic.arcadeHit(p,dir.x,dir.z))return;
+  function down(p,dir,heavy=true,zone=null,point=null){
+    if(!p.fall){if(!traffic.arcadeHit(p,dir.x,dir.z))return;}
+    else if(heavy&&p.ragdoll&&p.fall.mode==='tumble'){p.ragdoll.wake();p.ragdoll.kick(dir.x,dir.z,1.6);}
+    else return;
     hits++;lastHitFlash=.18;
-    react(p,p.x,ground(p.x,p.z)+.92,p.z,dir.x,dir.z,heavy);
+    react(p,point?.x??p.x,point?.y??ground(p.x,p.z)+.92,point?.z??p.z,dir.x,dir.z,heavy,zone);
   }
   function swing(){
     let nearest=2.05,target=null;
     const sx=Math.sin(cameraSystem.walkYaw),sz=Math.cos(cameraSystem.walkYaw);
-    for(const p of traffic.peds){
+    for(const p of traffic.streetTargets){
       if(!p.placed||p.fall||!p.rig.placed)continue;
       const dx=p.x-person.position.x,dz=p.z-person.position.z,d=Math.hypot(dx,dz);
       if(d>=nearest||d<.01||(dx*sx+dz*sz)/d<.38)continue;
@@ -143,17 +171,26 @@ export function createStreetPlay({scene,manager,cameraSystem,traffic,audio,map,c
     ammo[index]--;cooldown=gear[index].interval;attacks++;
     eyeRay.setFromCamera(locks()?pointer.set(0,0):pointer,cameraSystem.camera);
     const ray=eyeRay.ray;
-    const range=58;let best=unobstructed(ray.origin,ray.direction,range),target=null;
-    for(const p of traffic.peds){
-      if(!p.placed||p.fall||!p.rig.placed)continue;
-      const height=ground(p.x,p.z);
-      for(const offset of [.50,1.12,1.57]){
-        impact.set(p.x,height+offset,p.z);
+    const range=58;let best=unobstructed(ray.origin,ray.direction,range),target=null,hitZone=null;
+    for(const p of traffic.streetTargets){
+      if(!p.placed||!p.rig.placed||p.phase==='pull')continue;
+      if(Math.abs(p.x-ray.origin.x)>range+2||Math.abs(p.z-ray.origin.z)>range+2)continue;
+      const floor=ground(p.x,p.z);
+      impact.set(p.x,floor+.88,p.z);
+      if(ray.distanceSqToPoint(impact)>6.25)continue;
+      let pose;
+      if(p.fall?.mode==='tumble')pose=p.ragdoll.x;
+      else {p.rig.ragdollPoints(shotPose);pose=shotPose;}
+      for(const z of zones){
+        if(z.mask&&(p.rig.streetWounds&z.mask))continue;
+        impact.fromArray(pose,z.joint*3);
         const along=aim.subVectors(impact,ray.origin).dot(ray.direction);
-        if(along<=0||along>=best)continue;
-        // Generous screen-space targeting for a fast arcade control scheme.
-        const rr=.36+Math.min(.22,along*.003);
-        if(ray.distanceSqToPoint(impact)<=rr*rr){best=along;target=p;break;}
+        if(along<=0||along>best+.45)continue;
+        const radius=z.r+Math.min(.13,along*.0025),d2=ray.distanceSqToPoint(impact);
+        if(d2>radius*radius)continue;
+        const entry=along-Math.sqrt(radius*radius-d2);
+        if(entry>=best)continue;
+        best=entry;target=p;hitZone=z;
       }
     }
     ray.at(best,impact);
@@ -161,7 +198,7 @@ export function createStreetPlay({scene,manager,cameraSystem,traffic,audio,map,c
     aim.subVectors(impact,muzzle);const length=aim.length();aim.normalize();
     const cutoff=unobstructed(muzzle,aim,length);
     if(cutoff<length-.30){target=null;impact.copy(muzzle).addScaledVector(aim,cutoff);}
-    if(target)down(target,ray.direction);
+    if(target)down(target,ray.direction,true,hitZone,impact);
     person.heading=Math.atan2(aim.x,aim.z);
     audio.streetSound('shot',muzzle.x,muzzle.y,muzzle.z,index-1);
     tracer.position.addVectors(muzzle,impact).multiplyScalar(.5);

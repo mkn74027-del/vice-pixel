@@ -81,7 +81,7 @@ function createPedestrianSystem(network, { player, nearEdges, nearSignals, mayCr
 
   // One instanced draw per level of detail; every pedestrian has a PersonRig that plants its footsteps on the
   // sidewalk (no sliding), with their own build, height, sex, hair, clothes and gait
-  const pedCrowd = new PersonCrowd(NUM_PEDS);
+  const pedCrowd = new PersonCrowd(NUM_PEDS+12);
   const peds = [];
   for (let i = 0; i < NUM_PEDS; i++) {
     const female = prand(i, 1) < 0.48;
@@ -291,7 +291,7 @@ function createPedestrianSystem(network, { player, nearEdges, nearSignals, mayCr
         if (crowded) continue;
       }
       if (p.conversation) endConversation(p.conversation);
-      p.rig.streetLostArm=0;
+      p.streetGeneration=(p.streetGeneration||0)+1;p.rig.streetWounds=0;p.streetInjury=0;p.rig.streetLostArm=0;
       Object.assign(p, track);
       p.t = t;
       p.dir = t < track.len * 0.5 ? 1 : -1;
@@ -1055,6 +1055,7 @@ function createPedestrianSystem(network, { player, nearEdges, nearSignals, mayCr
       }
       renderPed(p, dt);
     }
+    for(const p of drivers)drawDriver(p,dt);
     pedCrowd.end();
   }
 
@@ -1076,6 +1077,34 @@ function createPedestrianSystem(network, { player, nearEdges, nearSignals, mayCr
   let onHit = null; // told who was knocked down by which vehicle (for the thud)
 
   // The vehicle (if any) driving into p hard enough to knock it down: one of its joints inside the vehicle's body
+  const drivers=Array.from({length:12},(_,i)=>({
+    index:NUM_PEDS+i, type:'pedestrian',placed:false,fall:null,ragdoll:null,
+    x:0,z:0, speed:1.6,dir:1,ux:0,uz:1,rig:new PersonRig({seed:25+i*1.41,scale:.95+(i%3)*.035,female:i%3===2})
+  }));
+  function startDriver(v,x,z,yaw){
+    const p=drivers.find(d=>!d.placed);
+    if(!p)return null;
+    Object.assign(p,{x,z,placed:true,car:v,phase:'pull',fall:null,heading:yaw,downTime:0,reach:0,
+      timer:0,fight:Math.random()<.48,angry:false,hitDelay:0,age:0,streetInjury:0});
+    p.streetGeneration=(p.streetGeneration||0)+1;p.rig.streetWounds=0;p.rig.streetLostArm=0;p.rig.streetPunch=0;
+    p.rig.reset(x,z,yaw,worldGround,p);return p;
+  }
+  function dropDriver(p,dx,dz){
+    knockDown(p,{arcadeHit:true,vx:dx,vz:dz});
+    p.phase=p.fight?'chase':'flee';
+  }
+  function drawDriver(p,dt){
+    if(!p.placed)return;
+    if(p.fall){
+      if(p.fall.mode==='return')p.fall=null;
+      else {fallen.push(p);updateFall(p,dt);return;}
+    }
+    if(p.phase!=='pull'){
+      const hit=struck(p);if(hit){knockDown(p,hit);updateFall(p,dt);return;}
+    }
+    p.rig.update(dt,p.x,p.z,p.heading,worldGround,p,p.seatOffset||0,true);
+    pedCrowd.add(p.rig,Math.hypot(p.x-focusX,p.z-focusZ));
+  }
   function struck(p) {
     const rig = p.rig;
     if (!rig.placed) return null;
@@ -1152,7 +1181,7 @@ function createPedestrianSystem(network, { player, nearEdges, nearSignals, mayCr
       // lie still a while (not on top of a car, nor under one), then get up
       f.lie = ragdoll.asleep ? f.lie + dt : 0;
       const wait = Math.min(LIE_MAX, LIE_MIN + ragdoll.impact * 0.22);
-      if ((f.lie > wait || f.time > LIE_LIMIT) && !ragdoll.contact.includes(2) && !ragdoll.covered(movers)) startRise(p);
+      if (!p.streetInjury && (f.lie > wait || f.time > LIE_LIMIT) && !ragdoll.contact.includes(2) && !ragdoll.covered(movers)) startRise(p);
     } else if (f.mode === 'rise') {
       const t = clock - f.start;
       const rise = f.rise;
@@ -1216,7 +1245,7 @@ function createPedestrianSystem(network, { player, nearEdges, nearSignals, mayCr
   const smoothstep = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
 
   return {
-    peds, meshes: pedCrowd.meshes, update, fallen,
+    peds, drivers,streetTargets:[...peds,...drivers],startDriver,dropDriver, meshes: pedCrowd.meshes, update, fallen,
     arcadeHit(p, dx, dz) {
       if (!p?.placed || p.fall || !p.rig.placed) return false;
       knockDown(p, {arcadeHit:true, vx:dx*2.6, vz:dz*2.6});

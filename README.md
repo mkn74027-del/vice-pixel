@@ -1,8 +1,8 @@
 # VICE PIXEL
 
-[**Neue Manhattan-Insel spielen**](https://mkn74027-del.github.io/vice-pixel/manhattan/?v=street41) · [Startseite](https://mkn74027-del.github.io/vice-pixel/) · [Bisheriger Prototyp](https://mkn74027-del.github.io/vice-pixel/legacy.html)
+[**Neue Manhattan-Insel spielen**](https://mkn74027-del.github.io/vice-pixel/manhattan/?v=street5) · [Startseite](https://mkn74027-del.github.io/vice-pixel/) · [Bisheriger Prototyp](https://mkn74027-del.github.io/vice-pixel/legacy.html)
 
-Die neue Fassung unter `manhattan/` verwendet die offene Stadtgrundlage **Slop New York** (MIT) mit realer Manhattan-Geografie. Hinzugefügt wurden drei Stadtaufträge, gerichtetes A*-GPS auf dem Verkehrsnetz, Ein-/Aussteigen per F, km/h und deutsche UI-Anpassungen. Zu Fuß kannst du sprinten, die Kamera frei drehen, zuschlagen und zwei Arcade-Waffen verwenden.
+Die neue Fassung unter `manhattan/` verwendet die offene Stadtgrundlage **Slop New York** (MIT) mit realer Manhattan-Geografie. Hinzugefügt wurden drei Stadtaufträge, gerichtetes A*-GPS auf dem Verkehrsnetz, Ein-/Aussteigen per F, km/h und deutsche UI-Anpassungen. Zu Fuß kannst du sprinten, die Kamera frei drehen, zuschlagen und zwei Arcade-Waffen verwenden. Drücke F neben einem langsamen Stadtauto, um es zu übernehmen.
 
 Es ist eine deutlich detailliertere Stadtbasis mit Verkehr, Fußgängern, Tag-/Nacht-Voreinstellungen, Küsten, Brücken, Taxi, Fahrrad und Helikopter. Sie ist kein vollständiges GTA-V-Spiel. Polizei, Läden und die 50 einfachen Szenarien des bisherigen Prototyps sind hier noch nicht integriert und bleiben in `legacy.html` erreichbar.
 

@@ -1344,9 +1344,9 @@ class PersonCrowd {
     const offset=l.count * STRIDE * 4;
     l.pose.value.array.set(rig.pose, offset);
     // Alter only the rendered costume. The original joint pose still drives contact and recovery.
-    if (rig.streetLostArm === 1 || rig.streetLostArm === 2) {
-      const bone = rig.streetLostArm === 1 ? BONE.FOREARM_L : BONE.FOREARM_R;
-      l.pose.value.array[offset + bone*8 + 7] = 0.01;
+    if(rig.streetWounds){
+      for(let bone=0;bone<BONE_COUNT;bone++)if(rig.streetWounds & (1<<bone))
+        l.pose.value.array[offset+bone*8+7]=.001;
     }
     l.count++;
   }
@@ -2586,7 +2586,7 @@ class PersonRig {
         ? lerp(0.88, 0.22, descendReach)
         : lerp(-0.56, -0.14, descendReach);
       const airFlex = lerp(jumpStandFlex, jumpRunFlex, moveJump);
-      const swinging = i === this.streetSide ? (this.streetPunch || 0) : 0;
+      const swinging = Math.max(this.streetReach||0,i === this.streetSide ? (this.streetPunch || 0) : 0);
       const raised = i === 1 && this.streetGear;
       const flex = raised ? 1.13 : lerp(lerp(groundFlex, airFlex, airB), 1.63, swinging);
 

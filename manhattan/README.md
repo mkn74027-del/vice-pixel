@@ -1,6 +1,6 @@
 # VICE PIXEL — Manhattan
 
-[Spielen](https://mkn74027-del.github.io/vice-pixel/manhattan/?v=street41)
+[Spielen](https://mkn74027-del.github.io/vice-pixel/manhattan/?v=street5)
 
 Befahrbare Manhattan-Insel mit echter Straßengeometrie, Gebäudeflächen und -höhen, Küsten, Brücken, Stadtverkehr, Fußgängern und Wahrzeichen. Die Umgebung und der Renderer stammen aus [Slop New York](https://github.com/mrdoob/slop-newyork), MIT, Stand `7fdf054aa7a8b1c005983a855fb3b308f2d9a948`. Eigenständige Ergänzungen: drei Stadtaufträge, zeit- und fahrzeugabhängige Kontrollpunkte, Geldbelohnungen, F zum Ein-/Aussteigen ins eigene Taxi, gerichtetes A*-GPS auf dem Verkehrsnetz, deutsche Oberflächenanpassungen und km/h.
 
@@ -22,7 +22,7 @@ Automatische Spielstand- und Sound-Einstellungen werden nur in einer flüchtigen
 | Q / R | Zu Fuß Ausrüstung wechseln / nachladen |
 | Tab | Spielmenü mit Ausrüstung, Effekten und Anzeigen öffnen |
 | Mausrad | Kameradistanz |
-| F | Am stehenden eigenen Taxi ein-/aussteigen |
+| F | Neben einem langsamen Stadtwagen den Fahrer herausziehen, in freie Wagen einsteigen, beim Halt aussteigen |
 | 1 / 2 / 3 / 4 | Gehen / Taxi / Fahrrad / Helikopter |
 | Leertaste | Zu Fuß springen, Fahrrad bremsen, Heli steigen |
 | Q / C | Heli sinken |
@@ -33,6 +33,8 @@ Automatische Spielstand- und Sound-Einstellungen werden nur in einer flüchtigen
 | H | HUD aus-/einblenden |
 
 Während die Inselkarte geöffnet ist, pausieren Bewegung und Auftragstimer. Die Karte lässt sich ziehen, zoomen und nach Straßen oder Wahrzeichen durchsuchen. Klicken setzt ein GPS-Ziel und versetzt den Spieler nicht. Gelbe Linien folgen dem gerichteten Straßengraphen. Ist kein Straßenweg verfügbar, zeigt eine gestrichelte Linie nur die Richtung; im Heli wird die Luftlinie angezeigt. Explizite Schnellreise ist separat wählbar und beendet einen laufenden Auftrag.
+
+Fahrer können fliehen, sich wehren oder ihren Wagen zurückholen. Treffer werden an den Gelenken der Figuren ausgewertet. Unter **Tab → Blut & Gore** lassen sich die sichtbaren Effekte anpassen.
 
 ## Stadtaufträge
 

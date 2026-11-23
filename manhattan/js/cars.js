@@ -1370,7 +1370,7 @@ const OCCUPANT_CLOTHES = [0x1a1c22, 0x4a5060, 0x2a3a5a, 0x8a8478, 0x5a2a2a];
  * seat backs with headrests per row (spec.interior.seats), a steering wheel, the driver and sometimes a passenger.
  * `hash` (0..1) picks the trim colour and the passengers. Returns the albedo the glass shows (before its tint).
  */
-function cabinInterior(spec, o, d, hash) {
+function cabinInterior(spec, o, d, hash, driverPresent) {
   const L = carLayout(spec);
   const cab = spec.cabin;
   const seats = spec.interior.seats;
@@ -1478,7 +1478,7 @@ function cabinInterior(spec, o, d, hash) {
       hit(ellipsoid(vec3(x, beltY - 0.02, zs + 0.09), vec3(0.2, 0.28, 0.12)), pickColor(OCCUPANT_CLOTHES, fract(pick.mul(3.7))));
     };
     // (the same for every fragment of a car: an empty seat costs nothing)
-    if (i === 0) seated();
+    if (i === 0) If(driverPresent,seated);
     else If(present.greaterThan(0.5), seated);
   });
   return col;
@@ -1773,7 +1773,8 @@ function createLoftedCarMaterial(spec, fixedColorHex = null) {
   const paint = fixed ? color(fixedColorHex) : attribute('paintColor', 'vec3');
 
   // Decode per-instance style code (livery 0..7, metallic 0..1, trim 0..3, wheel 0..3) in the vertex stage
-  const wCode = fixed ? float(0.0) : state.w;
+  const driverPresent=fixed ? float(1).greaterThan(0) : state.w.lessThan(65536);
+  const wCode = fixed ? float(0.0) : state.w.mod(65536);
   const vStyle = varying(
     vertexStage(
       vec4(
@@ -2521,7 +2522,7 @@ function createLoftedCarMaterial(spec, fixedColorHex = null) {
       const rayDerivatives = viewRayDerivatives(p);
       const cabinCol = vec3(0.02).toVar();
       If(glass.greaterThan(0.004).and(distance.lessThan(45.0)), () => {
-        cabinCol.assign(mix(cabinInterior(spec, p, objectViewRay(rayDerivatives), interiorHash), vec3(0.02), smoothstep(35.0, 45.0, distance)));
+        cabinCol.assign(mix(cabinInterior(spec, p, objectViewRay(rayDerivatives), interiorHash, driverPresent), vec3(0.02), smoothstep(35.0, 45.0, distance)));
       });
       // Green-grey laminated glass; privacy glass behind the B-pillar on SUVs & minivans. Fresnel reflection takes
       // over towards grazing angles

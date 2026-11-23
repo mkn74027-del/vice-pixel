@@ -332,7 +332,8 @@ class ThirdPersonControllerManager {
     const active = this.entities[mode];
     if (active.mesh) active.mesh.visible = true;
     if (active.helmet) active.helmet.visible = true;
-    if (mode === 'person') active._charHidden = false;
+    if(mode==='person'){active.inVehicle=false;active._charHidden=false;}
+    if(mode==='car')this.entities.person.inVehicle=true;
     else if (mode === 'cyclist') {
       active._riderHidden = false;
       active._posedX = NaN;
@@ -1041,7 +1042,7 @@ class ThirdPersonControllerManager {
     if (p) {
       const dx = focus ? p.position.x - focus.x : 0;
       const dz = focus ? p.position.z - focus.z : 0;
-      if (this.activeMode === 'person' || dx * dx + dz * dz <= maxDistSq) {
+      if (!p.inVehicle && (this.activeMode === 'person' || dx * dx + dz * dz <= maxDistSq)) {
         p._charHidden = false;
         if (p.mesh) p.mesh.visible = true;
         const groundY = this.getGroundHeight(p.position.x, p.position.z, 'person');
@@ -1116,7 +1117,7 @@ class ThirdPersonControllerManager {
 
     if (this.activeMode === 'person') {
       this.updatePerson(dt, elapsed);
-    } else {
+    } else if (!this.entities.person.inVehicle) {
       // Keep the sidewalk pedestrian walking naturally on the ground when not actively controlled
       const p = this.entities.person;
       const walkSpeed = 1.48;
@@ -1170,6 +1171,9 @@ class ThirdPersonControllerManager {
   updatePerson(dt) {
     if (dt <= 0) return;
     const p = this.entities.person;
+    if(p.streetPull || p.streetStun>0){
+      p.streetStun=Math.max(0,(p.streetStun||0)-dt);p.walkVX=p.walkVZ=p.speed=0;return;
+    }
     const view = this.walkViewYaw ?? p.heading;
     const forward = Number(this.keys.forward) - Number(this.keys.backward);
     const right = Number(this.keys.right) - Number(this.keys.left);
