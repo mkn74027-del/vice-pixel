@@ -1,51 +1,52 @@
 # VICE PIXEL: Blood & Neon
 
-An independently written, procedural WebGL open-world **PC prototype**. All playable game code is in [gta_vice_cartel_3d.html](gta_vice_cartel_3d.html). No npm, build, downloads, external models, fonts or libraries are required.
+Browser-playable PC open-world game. **This remains a work in progress, not a finished GTA-equivalent game.**
 
-**Play:** https://mkn74027-del.github.io/vice-pixel/
+Play: https://mkn74027-del.github.io/vice-pixel/
 
-## What this version implements
+The complete runtime, including compact embedded models and palettes, is in `gta_vice_cartel_3d.html`. No engine CDN, installation, build tool, automatic local save, or external asset request is needed. Source changes were made directly through GitHub, without a project checkout on the user's PC.
 
-- Polygonal 3D city, district labels, procedural facades/windows, palms, hills, roads, canal crossings, airport, docks, moving Ferris wheel, animated sky.
-- Third-person and first-person camera, building collision, walking, sprinting, jumping, swimming, health and armor.
-- 12 vehicle classes (31 initial vehicles): sport/super cars, limousine, truck, taxi, police, SWAT, bike, tank, boat, helicopter and plane. Simplified acceleration, reversing, collision, ramps, vertical flight and animated rotors.
-- GPU-displaced water waves, specular highlights, boat bobbing and spray particles; **not a volumetric fluid simulator**.
-- 50 selectable named mission scenarios over 10 acts with objectives built from reach, vehicle, package, combat, timed hold, vault and escape stages; selected story scenes use shortened dialogue.
-- Rotating minimap and zoomable clickable map, A* routes on the road intersection graph.
-- NPC pedestrians, simple traffic and direct pursuit police, wanted levels, combat, particles.
-- Six visible shoe choices with selected gameplay effects, four outfits and masks. Shops are accessed from outside or by the phone; buildings do not yet have modeled interiors.
-- Cash/dirty money/bank, deposit/withdrawal, basic bank heist, property purchase, laundering, laboratory and sector purchases and passive income.
-- Phone, fleet delivery, cheats, pause UI, resolution settings, Web Audio engine/siren/effect tones and simple sequenced radio music.
-- Copy/paste Save-Codes, no automatic localStorage/IndexedDB saving.
+## Revision 2: playable fundamentals
+
+- Corrected camera-relative WASD, including the previously inverted A/D strafe. Arrow keys also move/drive.
+- Mouse-look works over the game canvas without requiring browser pointer lock. Right-drag also works; clicking may enable pointer lock where supported. Pause menus release camera/input.
+- Orbiting near/far/hood cameras, building obstruction checks, smoothed follow and delayed driving auto-center.
+- Embedded Kenney CC0 vehicle models (sport, supercar, sedan, police, taxi and truck), one commercial building model and detailed palms. Sources: [ATTRIBUTIONS.md](ATTRIBUTIONS.md).
+- Smooth primitive character model with articulated gait, rather than a stack of boxes.
+- Shader materials for concrete, road, sidewalk, foliage, cloth, glass, painted metal and water; shadow mapping; 720p default and selectable lower resolutions.
+- Revised simplified driving: acceleration, braking before reverse, speed-sensitive steering, lateral grip, handbrake slip, body roll/pitch, rotating/steering wheels and automatic gear/RPM display.
+- Vehicle collisions use oriented rectangles. The player collides with parked vehicles instead of walking through them.
+- Physical storefront openings with sliding doors, shelves and counters. Walk in and press E near the counter.
+- Magazine ammunition and timed reloads drawing from a reserve; differentiated weapon damage, range and fire intervals; building occlusion checks.
+- Traffic-light visuals and basic stop behavior, horn, footsteps, engine and effect tones.
 
 ## Controls
 
 | Input | Action |
 |---|---|
-| WASD | Move / drive / thrust |
-| Click the game, then mouse | Camera and aiming |
-| Left click or J | Attack |
+| WASD / arrows | Walk / accelerate / brake / steer |
+| Mouse over game / right-drag | Camera |
+| Left click / J | Attack |
 | Shift | Sprint |
 | Space | Jump / handbrake |
-| E | Interact / enter / exit vehicle |
-| Q / Ctrl | Ascend / descend aircraft |
-| Tab | Weapon cycle |
-| R | Reload / radio in vehicle |
-| B / C | Mask / camera |
+| E | Enter/exit vehicle; interact at a counter or ATM |
+| Q / Ctrl | Aircraft ascend/descend |
+| Tab | Cycle weapon |
+| R | Reload / change radio while in a vehicle |
+| H | Horn |
+| B / C | Mask / camera mode |
 | P / M / Escape | Phone / map / pause |
 | F | Fullscreen |
 | Enter | Advance dialogue |
 
-## Honest scope and limitations
+## Other existing systems
 
-This is a playable first implementation, **not the full production game described in the initial brief**. Graphics are stylized low-poly; they are not GTA-quality photorealism. The 50 scenarios reuse a shared set of objective systems and have not all been played through. The complete supplied screenplay, bespoke cinematic sequences, articulated flight aerodynamics, advanced traffic pathfinding, destructible bridges, stealth/heist branching, detailed interiors, real voice speech and every equipment modifier remain future work. The tank weapon uses the shared combat system. No commercial GTA assets or template source were copied.
-
-GitHub template research found niklasvh/WebGL-GTA, but its README describes a 1997-map parsing experiment with only rudimentary pedestrian movement, so it was not reused.
-
-## Storage
-
-Source is kept in this GitHub repository. No project checkout or package installation was created on the user's PC. Opening any web page can use the browser's ordinary cache; the game does not deliberately save persistent game state. The optional offline HTML can be downloaded manually.
+City districts, roads, hills, canal crossings, docks, airport, pier, animated Ferris wheel; boats and simplified flying vehicles; animated non-volumetric water with bobbing/spray; health and armor; pedestrians and basic police pursuit/wanted levels; minimap and A* GPS; 50 named selectable objective scenarios; short story dialogues; shops and visible equipment; cash/dirty money/bank; simple heists, asset/lab/sector purchases and passive income; phone/fleet/cheats; manual Save-Code import/export.
 
 ## Validation
 
-JavaScript syntax and in-memory simulation checks passed for all 50 mission definitions, A* routing, mission completion/reward, death/respawn, boat acquisition and package-to-delivery stage transition. Live browser QA on the deployed version passed: free-play start, keyboard walking, entering and accelerating a sports car, following camera, phone navigation, purchasing/equipping Turbo-Runner shoes, Save-Code import through the in-game form, entering/driving a speedboat, animated water/spray, clicking a map GPS target, mission 11 dialogue and transition to package collection, entering a helicopter and ascending to approximately 9 m. WebGL reported error code 0 and the game's error panel remained empty during the corrected-version checks. An embedded-browser prompt() incompatibility was found and fixed by replacing native prompts with the in-game form. The full 50-mission campaign has not been end-to-end tested.
+In-memory regression checks cover camera-relative D at three camera headings, oriented vehicle overlap/separation, unobstructed acceleration, braking and timed reload consumption. Door openings and wall collision were also checked. Browser QA is run on preview.html before replacing the main game.
+
+## Limits
+
+Graphics remain stylized, not photorealistic. Driving is a simplified controller, not a complete suspension/rigid-body simulator. Characters are procedurally animated, not motion-captured. NPC traffic and police are basic. Water is a displaced surface, not a fluid-volume simulation. Shop interiors are compact and share a furnishing system. The 50 scenarios reuse objective systems, their complete playthrough is unverified, and the original full screenplay/cinematic sequences are not implemented. Advanced stealth, destructible bridges, full air combat, all original equipment modifiers, real radio speech and bespoke interiors still require work.
