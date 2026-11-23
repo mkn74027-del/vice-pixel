@@ -1,6 +1,6 @@
 import * as THREE from 'three/webgpu';
 
-// Recycle world-space effects. Even at the highest setting there are three instanced draws.
+// Pool transient effects. Particle count does not add draw calls within a pool.
 export function createImpactEffects(scene, ground, camera) {
   const root = new THREE.Group();
   scene.add(root);
@@ -27,7 +27,7 @@ export function createImpactEffects(scene, ground, camera) {
   }
   const stainGeometry=new THREE.ShapeGeometry(outline);
   stainGeometry.rotateX(-Math.PI/2);
-  const droplets=pool(new THREE.IcosahedronGeometry(1,0),540);
+  const droplets=pool(new THREE.IcosahedronGeometry(1,0),760);
   const debris=pool(new THREE.DodecahedronGeometry(1,0),136);
   const stains=pool(stainGeometry,440,new THREE.MeshStandardNodeMaterial({color:0xffffff,roughness:.34,metalness:.04}));
   // A soft, short-lived spray sits behind the heavier ballistic drops.
@@ -35,6 +35,12 @@ export function createImpactEffects(scene, ground, camera) {
   const ctx=canvas.getContext('2d'),gradient=ctx.createRadialGradient(32,32,1,32,32,31);
   gradient.addColorStop(0,'rgba(255,255,255,.60)');gradient.addColorStop(.42,'rgba(255,255,255,.38)');
   gradient.addColorStop(1,'rgba(255,255,255,0)');ctx.fillStyle=gradient;ctx.fillRect(0,0,64,64);
+  const pixels=ctx.getImageData(0,0,64,64);
+  for(let y=0;y<64;y++)for(let x=0;x<64;x++){
+    const i=(y*64+x)*4+3,grain=.80+.15*Math.sin(x*.53+Math.sin(y*.38)*2)*Math.sin(y*.44)+Math.random()*.10;
+    pixels.data[i]=Math.round(pixels.data[i]*grain);
+  }
+  ctx.putImageData(pixels,0,0);
   const cloud=pool(new THREE.PlaneGeometry(1,1),64,new THREE.MeshBasicNodeMaterial({
     map:new THREE.CanvasTexture(canvas),transparent:true,depthWrite:false,opacity:.74,side:THREE.DoubleSide
   }));
@@ -118,13 +124,13 @@ export function createImpactEffects(scene, ground, camera) {
     if(y-ground(x,z)<.52)stain(x+(Math.random()-.5)*.2,z+(Math.random()-.5)*.2,.16+(12-w.life)*.057,1.18);
   }
   let level=2;
-  function stain(x,z,size,stretch=1) {
+  function stain(x,z,size,stretch=1,direction=Math.random()*Math.PI*2) {
     add(stains,{x,y:ground(x,z)+.026+Math.random()*.012,z,size,stretch,
-      angle:Math.random()*Math.PI*2,age:0,life:level===2?77:19,color:Math.random()>.45?0x741020:0x9e1826});
+      angle:direction,age:0,life:level===2?77:19,color:Math.random()>.45?0x741020:0x9e1826});
   }
   function burst(x,y,z,dx,dz,strong) {
     if(level===0)return;
-    const many=level===2, amount=many?(strong?116:51):12;
+    const many=level===2, amount=many?(strong?152:64):12;
     if(many){
       const heading=Math.atan2(dx,dz),n=strong?8:3;
       for(let i=0;i<n;i++){
@@ -137,22 +143,21 @@ export function createImpactEffects(scene, ground, camera) {
     for(let i=0;i<amount;i++){
       const a=i%3?Math.atan2(dz,dx)+(Math.random()-.5)*(many?1.7:2.7):Math.random()*Math.PI*2;
       const speed=(many?7.3:2.3)*Math.random();
-      const piece=many&&i%7===0;
+      const piece=many&&strong&&i%19===0;
       const vx=Math.cos(a)*speed+dx/magnitude*(strong?2.1:1.1), vz=Math.sin(a)*speed+dz/magnitude*(strong?2.1:1.1);
       add(piece?debris:droplets,{x,y:y+Math.random()*.22,z,vx,vy:1.2+Math.random()*(many?4.8:2.8),vz,
-        size:(piece?.11:.042)*(1+Math.random()*1.25),angle:a,spin:Math.random()*8-4,landed:false,
-        age:0,life:piece?7:1.9,color:piece?(i%2?0x8f2437:0xb84651):(i%3?0xb7192b:0x770720)});
+        size:piece?.038+Math.random()*.042:.008+Math.random()**1.7*.031,angle:a,spin:Math.random()*8-4,landed:false,
+        age:0,life:piece?7:1.9,color:piece?(i%2?0x651820:0x84252b):(i%3?0x961526:0x690e19)});
     }
-    stain(x,z,many?(strong?1.75:.90):.37);
-    if(many)for(let i=0;i<(strong?20:10);i++){
-      const a=Math.random()*Math.PI*2,r=Math.random()*(strong?2.6:1.7);
-      stain(x+Math.cos(a)*r,z+Math.sin(a)*r,.08+Math.random()*.24,1.1+Math.random());
-    }
+    // Immediate transfer is small. Airborne drops seed the footprint as they actually land.
+    stain(x,z,many?(strong?.56:.29):.17,1.2,Math.atan2(-dz,dx));
   }
   function write(group,index,p,sx,sy,sz,rx,ry,rz) {
     transform.position.set(p.x,p.y,p.z);transform.rotation.set(rx,ry,rz);transform.scale.set(sx,sy,sz);
     transform.updateMatrix();group.mesh.setMatrixAt(index,transform.matrix);
-    tint.setHex(p.color);group.mesh.setColorAt(index,tint);
+    tint.setHex(p.color);
+    if(group===stains)tint.multiplyScalar(1-.57*Math.min(1,p.age/39));
+    group.mesh.setColorAt(index,tint);
   }
   function render(group, dt, draw) {
     let n=0;
@@ -171,11 +176,25 @@ export function createImpactEffects(scene, ground, camera) {
       const floor=ground(p.x,p.z);
       if(p.y<=floor+p.size*.32){
         p.landed=true;p.y=floor+p.size*.32;
-        if(group===droplets){p.life=p.age+.03;if(level===2&&Math.random()<.16)stain(p.x,p.z,.10+Math.random()*.16);}
+        if(group===droplets){
+          p.life=p.age+.03;
+          if(level===2&&Math.random()<.55){
+            const horizontal=Math.hypot(p.vx,p.vz),oblique=Math.min(2,horizontal/Math.max(1,Math.abs(p.vy)));
+            stain(p.x,p.z,.033+p.size*2.35,1+oblique,Math.atan2(-p.vz,p.vx));
+          }
+        }
       }
     }
     const size=p.size*Math.min(1,(p.life-p.age)*3);
-    write(group,index,p,size,size*(group===debris?.72:1.65),size*.8,p.angle,p.angle*.7,0);
+    if(group===droplets){
+      // Carry the long axis along the velocity as the trajectory bends toward the ground.
+      const horizontal=Math.hypot(p.vx,p.vz),speed=Math.hypot(horizontal,p.vy);
+      transform.position.set(p.x,p.y,p.z);
+      transform.rotation.set(Math.atan2(horizontal,p.vy),Math.atan2(p.vx,p.vz),0,'YXZ');
+      transform.scale.set(size*.75,size*(1+Math.min(2.8,speed*.31)),size*.75);
+      transform.updateMatrix();group.mesh.setMatrixAt(index,transform.matrix);
+      tint.setHex(p.color);group.mesh.setColorAt(index,tint);
+    }else write(group,index,p,size,size*.64,size*.69,p.angle,p.angle*.7,0);
   }
   return {burst,wound,tire,separate:releasePart,trail(x,z){if(level===2)stain(x,z,.2+Math.random()*.22,1.7);},
     setLevel(value){level=value;if(value<2){for(const g of [tread,cloud,debris]){g.items.length=0;g.mesh.count=0;}for(const piece of separated)piece.node.visible=false;for(const w of wounds)w.mesh.visible=false;}if(!value)for(const group of [stains,droplets,debris]){group.items.length=0;group.mesh.count=0;}},
