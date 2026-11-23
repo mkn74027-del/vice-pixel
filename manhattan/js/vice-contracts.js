@@ -68,6 +68,7 @@ export function createCityContracts({scene,controllerManager:manager,mapSystem,c
     if(mode==='car'){
       const car=manager.entities.car;
       if(Math.abs(car.speed)>2.5){tell('Zum Aussteigen zuerst anhalten.');return;}
+      car.speed=car.vx=car.vz=car.angularVel=0;
       selectMode('person');
       manager.teleportActiveTo(car.position.x+Math.cos(car.heading)*3.8,car.position.z-Math.sin(car.heading)*3.8,car.heading);
       cameraSystem.resetForTeleport();previous=null;spawnProtection=1;tell('Ausgestiegen. Mit F steigst du wieder ins Taxi.');

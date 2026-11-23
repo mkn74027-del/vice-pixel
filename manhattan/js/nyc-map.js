@@ -451,7 +451,7 @@ class NYCMapSystem {
     this.elHoverInfo = document.getElementById('fullmap-hover-info');
     this.elPlayerInfo = document.getElementById('fullmap-player-info');
     this.elSearchInput = document.getElementById('fullmap-search');
-    if (this.elSearchInput) this.elSearchInput.placeholder = `Search ${ROAD_NAME_COUNT} streets & landmarks…`;
+    if (this.elSearchInput) this.elSearchInput.placeholder = `${ROAD_NAME_COUNT} Straßen und Orte durchsuchen …`;
 
     this.isFullMapOpen = false;
     // Full map viewport state (world metres; zoom in CSS pixels per metre)
@@ -1087,7 +1087,7 @@ class NYCMapSystem {
 
     const ent = this.controllerManager.getActiveEntity();
     if (this.elPlayerInfo) {
-      const text = `You are at ${getLocationLabel(ent.position.x, ent.position.z)}`;
+      const text = `Standort: ${getLocationLabel(ent.position.x, ent.position.z)}`;
       if (text !== this.playerInfoText) {
         this.playerInfoText = text;
         this.elPlayerInfo.textContent = text;

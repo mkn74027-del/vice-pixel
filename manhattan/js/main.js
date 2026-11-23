@@ -542,6 +542,7 @@ async function initApp() {
     allBlocks: cityBlocks.allBlocks,
     onToggle: (open) => {
       controllerManager.resetInput();
+      controllerManager.inputBlocked = open;
       touchControls.setEnabled(!open);
       gamepadControls.setEnabled(!open);
       const mapHint = document.getElementById('fullmap-hover-info');
@@ -740,22 +741,23 @@ async function initApp() {
     const rawDt = (now - lastTime) * 0.001;
     lastTime = now;
     const dt = Math.min(Math.max(rawDt, 0.001), 0.05);
-    elapsed += dt;
+    const worldDt = mapSystem.isFullMapOpen ? 0 : dt;
+    elapsed += worldDt;
 
     // Update 3rd-person controllers, camera, signals, traffic & vehicle collisions, building LODs, and dynamic shadow focus
-    gamepadControls.update(dt);
-    controllerManager.update(dt, elapsed, cameraSystem.initialized ? cameraSystem.currentPos : null);
+    gamepadControls.update(worldDt);
+    if (worldDt > 0) controllerManager.update(worldDt, elapsed, cameraSystem.initialized ? cameraSystem.currentPos : null);
     cameraSystem.update(dt, elapsed);
     streetDetails.signalClock.value = elapsed;
-    trafficSystem.update(
-      dt,
+    if (worldDt > 0) trafficSystem.update(
+      worldDt,
       elapsed,
       cameraSystem.currentPos,
       controllerManager.getActiveEntity(),
       controllerManager.activeMode,
       cameraSystem.camera
     );
-    highwayTraffic.update(dt, cameraSystem.camera, controllerManager.getActiveEntity(), controllerManager.activeMode);
+    if (worldDt > 0) highwayTraffic.update(worldDt, cameraSystem.camera, controllerManager.getActiveEntity(), controllerManager.activeMode);
     if (!document.hidden && now >= nextPlayerSave) {
       savePlayerState();
       nextPlayerSave = now + 5000;
@@ -766,7 +768,7 @@ async function initApp() {
     if (streetDetails.update) streetDetails.update(cameraSystem.camera);
     lightingSystem.update(cameraSystem.currentPos);
     colorGrade.update();
-    cityContracts.update(dt, elapsed);
+    cityContracts.update(worldDt, elapsed);
     mapSystem.update();
     audioSystem.update(dt, elapsed, cameraSystem.camera, lightingSystem.activePresetId === 'midnight');
     if (warmedUp) updateSceneCulling(cameraSystem.camera.position); // the warm-up frame draws every chunk

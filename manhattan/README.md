@@ -28,7 +28,7 @@ Automatische Spielstand- und Sound-Einstellungen werden nur in einer flüchtigen
 | N / B | Sound ein-/ausschalten / hupen |
 | H | HUD aus-/einblenden |
 
-Die Karte lässt sich ziehen, zoomen und nach Straßen oder Wahrzeichen durchsuchen. Klicken setzt ein GPS-Ziel und versetzt den Spieler nicht. Gelbe Linien folgen dem gerichteten Straßengraphen. Ist kein Straßenweg verfügbar, zeigt eine gestrichelte Linie nur die Richtung; im Heli wird die Luftlinie angezeigt. Explizite Schnellreise ist separat wählbar und beendet einen laufenden Auftrag.
+Während die Inselkarte geöffnet ist, pausieren Bewegung und Auftragstimer. Die Karte lässt sich ziehen, zoomen und nach Straßen oder Wahrzeichen durchsuchen. Klicken setzt ein GPS-Ziel und versetzt den Spieler nicht. Gelbe Linien folgen dem gerichteten Straßengraphen. Ist kein Straßenweg verfügbar, zeigt eine gestrichelte Linie nur die Richtung; im Heli wird die Luftlinie angezeigt. Explizite Schnellreise ist separat wählbar und beendet einen laufenden Auftrag.
 
 ## Stadtaufträge
 

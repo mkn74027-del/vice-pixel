@@ -265,7 +265,7 @@ class ThirdPersonControllerManager {
 
     const onKey = (e, isDown) => {
       const action = actionsByCode.get(e.code);
-      if (!action || (isDown && isTypingInField(e))) return;
+      if (!action || (isDown && (isTypingInField(e) || this.inputBlocked))) return;
       if (isDown) this._pressedCodes.add(e.code);
       else this._pressedCodes.delete(e.code);
       // Releasing one binding must not cancel another key held for the same action.
