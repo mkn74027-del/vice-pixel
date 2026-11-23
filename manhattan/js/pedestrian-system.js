@@ -1304,7 +1304,7 @@ function createPedestrianSystem(network, { player, nearEdges, nearSignals, mayCr
   return {
     peds, drivers,streetTargets:[...peds,...drivers],startDriver,dropDriver, meshes: pedCrowd.meshes, update, fallen,
     arcadeHit(p, dx, dz) {
-      if (!p?.placed || p.fall || !p.rig.placed) return false;
+      if (!p?.placed || p.fall?.mode==='tumble' || !p.rig.placed) return false;
       knockDown(p, {arcadeHit:true, vx:dx*2.6, vz:dz*2.6});
       return true;
     },

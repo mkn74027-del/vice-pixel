@@ -1139,7 +1139,7 @@ class ThirdPersonControllerManager {
     }
 
     if (this.activeMode === 'car') {
-      this.updateCar(dt, elapsed);
+      this.updateCar(dt);
     } else if (this.activeMode === 'cyclist') {
       this.updateCyclist(dt, elapsed);
     } else if (this.activeMode === 'helicopter') {

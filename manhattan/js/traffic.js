@@ -1,7 +1,7 @@
 import {applyImpact} from './car-damage.js';
 import * as THREE from 'three/webgpu';
 import { buildRoadNetwork } from './road-network.js';
-import { createPedestrianSystem } from './pedestrian-system.js?v=motion72';
+import { createPedestrianSystem } from './pedestrian-system.js?v=motion73';
 import { vehicleContact, resolveVehicleContact, sweptVehicleContact } from './vehicle-physics.js';
 import { createMover, vehicleShape } from './ragdoll.js';
 import { signalPhase, walkSignal } from './city-config.js';

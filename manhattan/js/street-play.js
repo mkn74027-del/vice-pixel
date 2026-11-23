@@ -1,7 +1,7 @@
 import {applyImpact,vehicleRay} from './car-damage.js';
 import * as THREE from 'three/webgpu';
 import { RAGDOLL_POINTS } from './ragdoll.js';
-import { createImpactEffects } from './street-effects.js?v=motion72';
+import { createImpactEffects } from './street-effects.js?v=motion73';
 
 const gear=[
   {name:'Fäuste',mag:0,interval:.44},
@@ -161,7 +161,7 @@ export function createStreetPlay({law,scene,manager,cameraSystem,traffic,audio,m
     return range;
   }
   function down(p,dir,heavy=true,zone=null,point=null){
-    if(!p.fall){if(!traffic.arcadeHit(p,dir.x,dir.z))return;}
+    if(p.fall?.mode!=='tumble'){if(!traffic.arcadeHit(p,dir.x,dir.z))return;}
     else if(heavy&&p.ragdoll&&p.fall.mode==='tumble'){p.ragdoll.wake();p.ragdoll.kick(dir.x,dir.z,1.6);}
     else return;
     hits++;lastHitFlash=.18;law.report(heavy?'shotHit':'fight',heavy?24:16,.75);
