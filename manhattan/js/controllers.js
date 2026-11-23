@@ -1,3 +1,4 @@
+import {applyImpact} from './car-damage.js';
 import * as THREE from 'three/webgpu';
 import {
   ISLAND_BOUNDS,
@@ -240,6 +241,7 @@ class ThirdPersonControllerManager {
 
   // Reuse one synchronous event; consumers must copy retained fields. Normal points from b toward a.
   reportCollision(a, b, kind, x, y, z, nx, ny, nz, speed) {
+    if(kind==='building')applyImpact(a,x,z,speed);
     if (!this._collisionListener || speed <= 0.5) return;
     const event = this._collisionEvent;
     event.a = a; event.b = b; event.kind = kind;
@@ -541,6 +543,7 @@ class ThirdPersonControllerManager {
     const doorMid = (spec.doors[0] + spec.doors[1]) / 2;
     for (const side of [-1, 1]) {
       const decal = new THREE.Mesh(buildCarSidePatch(spec, side, doorMid - 0.36, doorMid + 0.36, 0.53, 0.81, 0.003), doorDecalMat);
+      if(side===1)decal.name="DriverDoorDecal";
       chassisPivot.add(decal);
     }
 
@@ -604,7 +607,7 @@ class ThirdPersonControllerManager {
       label: 'NYC Yellow Taxi',
       mesh: root,
       chassisPivot,
-      carState,
+      bodyMaterial:taxiLoftMat,carState,
       headLights,
       wheels,
       position: new THREE.Vector3(3.6, 0.0, SPAWN_Z + 12),
@@ -1240,12 +1243,16 @@ class ThirdPersonControllerManager {
     if (this.keys.forward) throttle = this.keys.forward;
     else if (this.keys.backward) throttle = -this.keys.backward;
 
+    const damage=(c.trafficCar||c).crush;
+    const engine=damage?Math.max(damage[0],damage[1]):0;
     const braking = c.speed * throttle < 0;
+    if(!braking)throttle*=1-.56*engine;
 
     let steerInput = 0;
     if (this.keys.left) steerInput = this.keys.left;
     if (this.keys.right) steerInput = -this.keys.right;
 
+    if(damage)steerInput+=Math.min(1,Math.abs(c.speed)/14)*(damage[0]-damage[1])*.13;
     const prevX = c.position.x;
     const prevZ = c.position.z;
     c.prevX = prevX;

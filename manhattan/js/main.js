@@ -1,6 +1,7 @@
-import { createStreetRides } from './street-rides.js?v=rides51';
-import { createStreetPlay } from './street-play.js?v=rides51';
-import { createCityContracts } from './vice-contracts.js?v=rides51';
+import {createDispatch} from './dispatch.js';
+import { createStreetRides } from './street-rides.js?v=impact62';
+import { createStreetPlay } from './street-play.js?v=impact62';
+import { createCityContracts } from './vice-contracts.js?v=impact62';
 import { createNavigator } from './vice-gps.js';
 import * as THREE from 'three/webgpu';
 import { pass, mrt, output, normalView, positionView, metalness, roughness, vec2, smoothstep } from 'three/tsl';
@@ -18,7 +19,7 @@ import { buildCityBlocks } from './buildings.js';
 import { buildStreetDetails } from './street-details.js';
 import { createTrafficSystem, createHighwayTraffic } from './traffic.js';
 import { buildRoadPaint } from './road-paint.js';
-import { ThirdPersonControllerManager } from './controllers.js?v=rides51';
+import { ThirdPersonControllerManager } from './controllers.js?v=impact62';
 import { TouchControls } from './touch-controls.js';
 import { GamepadControls } from './gamepad-controls.js';
 import { CameraSystem, CAMERA_PRESETS } from './cameras.js';
@@ -565,9 +566,15 @@ async function initApp() {
     onTeleport: teleportTo
   });
 
-  streetRides=createStreetRides({manager:controllerManager,traffic:trafficSystem,selectMode,camera:cameraSystem,scene,audio:audioSystem});
+  const law=createDispatch({manager:controllerManager,traffic:trafficSystem,release(){
+    selectMode('person');
+    const p=controllerManager.entities.person;
+    controllerManager.resetInput();p.streetStun=1.35;
+  }});
+  trafficSystem.setPatrolImpact(speed=>law.report('cruiser',Math.min(36,12+speed),2.4));
+  streetRides=createStreetRides({law,manager:controllerManager,traffic:trafficSystem,selectMode,camera:cameraSystem,scene,audio:audioSystem});
   const cityContracts=createCityContracts({scene,controllerManager,mapSystem,interactVehicle:streetRides.interact});
-  const streetPlay=createStreetPlay({scene,manager:controllerManager,cameraSystem,traffic:trafficSystem,audio:audioSystem,map:mapSystem,canvas:renderer.domElement,selectMode});
+  const streetPlay=createStreetPlay({law,scene,manager:controllerManager,cameraSystem,traffic:trafficSystem,audio:audioSystem,map:mapSystem,canvas:renderer.domElement,selectMode});
   mapSystem.routeProvider = createNavigator(trafficSystem.network, controllerManager);
 
   teleportButtons.forEach((btn) => {
@@ -785,7 +792,7 @@ async function initApp() {
     colorGrade.update();
     cityContracts.update(worldDt, elapsed);
     streetPlay.update(worldDt);
-    streetRides.update(worldDt);
+    streetRides.update(worldDt);law.update(worldDt);
     mapSystem.update();
     audioSystem.update(dt, elapsed, cameraSystem.camera, lightingSystem.activePresetId === 'midnight');
     if (warmedUp) updateSceneCulling(cameraSystem.camera.position); // the warm-up frame draws every chunk

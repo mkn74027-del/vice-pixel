@@ -333,6 +333,7 @@ class Ragdoll {
    * (see Mover) that collide with it
    */
   step(dt, world, movers) {
+    this.strikeMover=null;this.strikeJoint=-1;this.strikeWheel=false;this.strikeSpeed=0;
     this.time += dt;
     if (this.asleep) {
       // woken by a vehicle reaching it
@@ -665,6 +666,10 @@ class Ragdoll {
           // rolled over by a tyre: dragged along a little (and the vehicle bumps over it)
           if (_wheel.hit && last && this.contact[i] !== 2) {
             mv.wheelHits++;
+            const speed=Math.hypot(mv.vx,mv.vz);
+            if(speed>2.7&&(!this.strikeWheel||speed>this.strikeSpeed)){
+              this.strikeSpeed=speed;this.strikeWheel=true;this.strikeMover=mv;this.strikeJoint=i;
+            }
             this.contact[i] = 2;
             this.cn[o] = 0; this.cn[o + 1] = 1; this.cn[o + 2] = 0;
             moverVelocity(mv, x[o], x[o + 2], this.cv, o);
@@ -679,6 +684,9 @@ class Ragdoll {
           if (last) {
             // how hard it was hit: the vehicle's speed where it struck (against the body's own)
             const rel = Math.hypot(this.cv[o] - this.v[o], this.cv[o + 2] - this.v[o + 2]);
+            if(!this.strikeWheel&&rel>this.strikeSpeed&&Math.hypot(mv.vx,mv.vz)>3.1&&rel>3.3){
+              this.strikeSpeed=rel;this.strikeMover=mv;this.strikeJoint=i;
+            }
             if (rel > this.impact && Math.hypot(this.cv[o], this.cv[o + 2]) > 1) this.impact = Math.min(rel, Math.hypot(this.cv[o], this.cv[o + 2]));
           }
         }

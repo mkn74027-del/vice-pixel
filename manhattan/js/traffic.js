@@ -1,6 +1,7 @@
+import {applyImpact} from './car-damage.js';
 import * as THREE from 'three/webgpu';
 import { buildRoadNetwork } from './road-network.js';
-import { createPedestrianSystem } from './pedestrian-system.js?v=rides51';
+import { createPedestrianSystem } from './pedestrian-system.js?v=impact62';
 import { vehicleContact, resolveVehicleContact, sweptVehicleContact } from './vehicle-physics.js';
 import { createMover, vehicleShape } from './ragdoll.js';
 import { signalPhase, walkSignal } from './city-config.js';
@@ -141,8 +142,13 @@ function createCarAttributes() {
   const dirtyPaint = new Set();
   const dirtyState = new Set();
   return {
-    write(mesh, slot, paint, brake, left, right, style) {
+    write(mesh, slot, paint, brake, left, right, style, car=null, yaw=0) {
       const attrs = mesh.geometry.attributes;
+      const dents=car?.crush;
+      const off=slot*4;
+      for(let i=0;i<4;i++)attrs.carCrush.array[off+i]=dents?.[i]||0;
+      attrs.carPanels.array[off]=dents?.[4]||0;attrs.carPanels.array[off+1]=dents?.[5]||0;
+      attrs.carPanels.array[off+2]=car?.doorAngle||0;attrs.carPanels.array[off+3]=yaw;
       const p = attrs.paintColor.array;
       const o3 = slot * 3;
       if (p[o3] !== paint[0] || p[o3 + 1] !== paint[1] || p[o3 + 2] !== paint[2]) {
@@ -164,6 +170,7 @@ function createCarAttributes() {
     // Flags the first n instances of mesh for upload: their matrices, and their paint & state if any changed
     upload(mesh, n) {
       flagRange(mesh.instanceMatrix, n);
+      flagRange(mesh.geometry.attributes.carCrush,n);flagRange(mesh.geometry.attributes.carPanels,n);
       if (dirtyPaint.has(mesh)) flagRange(mesh.geometry.attributes.paintColor, n);
       if (dirtyState.has(mesh)) flagRange(mesh.geometry.attributes.carState, n);
     },
@@ -186,6 +193,7 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
 
   // Synchronous notification: listeners must copy any fields they retain. Normal points from b toward a.
   function reportCollision(a, b, x, y, z, nx, nz, speed, kind = 'vehicle') {
+    if(kind==='vehicle'&&speed>=2.4){applyImpact(a,x,z,speed);applyImpact(b,x,z,speed);}
     if (!collisionListener || speed <= 0.5) return;
     collisionEvent.kind = kind;
     collisionEvent.a = a; collisionEvent.b = b;
@@ -387,6 +395,8 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
     const lodMesh = (g) => {
       g.setAttribute('paintColor', new THREE.InstancedBufferAttribute(new Float32Array(n * 3), 3));
       g.setAttribute('carState', new THREE.InstancedBufferAttribute(new Float32Array(n * 4), 4));
+      g.setAttribute('carCrush',new THREE.InstancedBufferAttribute(new Float32Array(n*4),4));
+      g.setAttribute('carPanels',new THREE.InstancedBufferAttribute(new Float32Array(n*4),4));
       return new THREE.InstancedMesh(g, mat, n);
     };
     const halfWidth = Math.max(...spec.halfWidth.map((p) => p[1])) + spec.archFlare;
@@ -592,8 +602,8 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
     player, nearEdges, nearSignals, mayCross, walkOn, visible, nearView, movers
   });
   let onPersonImpact = null;
-  pedestrianSystem.setHitListener((p, m) => {
-    onPersonImpact?.(p,m);
+  pedestrianSystem.setHitListener((p, m, joint, wheel) => {
+    onPersonImpact?.(p,m,joint,wheel);
     const speed = Math.hypot(m.vx, m.vz);
     const dx = p.x - m.x, dz = p.z - m.z, d = Math.hypot(dx, dz) || 1;
     reportCollision(m.ref, p, p.x, 0.9, p.z, dx / d, dz / d, speed, 'pedestrian');
@@ -861,7 +871,7 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
 
   // Intelligent Driver Model: acceleration on a free road, and the braking term for an obstacle `gap` metres
   // (bumper to bumper) ahead moving at `speed`
-  const freeAcc = (v) => v.driver.a * (1 - (v.speed / v.v0) ** 4);
+  const freeAcc = (v) => v.driver.a*(v.responding?1.45:1)*(1-(v.speed/(v.v0*(v.responding?1.58:1)))**4);
   function brake(v, gap, speed, s0 = v.driver.s0, T = v.driver.T) {
     const { a, b } = v.driver;
     const desired = s0 + Math.max(0, v.speed * T + (v.speed * (v.speed - speed)) / (2 * Math.sqrt(a * b)));
@@ -897,7 +907,30 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
   // Mostly straight on, sometimes a turn (buses keep to wide roads). Routes don't follow the camera;
   // distant vehicles are recycled instead. With `fromLane`, only moves the current lane allows.
   const weights = [];
+  let responseX=0,responseZ=0,patrolImpact=null;
+  function pursuitTurn(v,fromLane){
+    const options=v.edge.moves.filter(m=>!fromLane||m.out[v.lane]>=0);
+    if(!options.length)return null;
+    // Compare reachable continuations across the next several blocks. No lane changes
+    // or shortcuts through buildings are added to the normal traffic rules.
+    const queue=[],visited=new Map();
+    let best=null,score=Infinity;
+    for(const m of options)queue.push({edge:m.to,first:m,cost:0,depth:0});
+    for(let i=0;i<queue.length&&i<260;i++){
+      const {edge,first,cost,depth}=queue[i];
+      const along=clamp((responseX-edge.sx)*edge.dx+(responseZ-edge.sz)*edge.dz,0,edge.len);
+      const gap=Math.hypot(responseX-edge.sx-edge.dx*along,responseZ-edge.sz-edge.dz*along);
+      const value=gap+(cost+along)*.32;
+      if(value<score){best=first;score=value;}
+      const nextCost=cost+edge.len;
+      if(depth>=5||nextCost>850||(visited.get(edge)??Infinity)<=nextCost)continue;
+      visited.set(edge,nextCost);
+      for(const turn of edge.moves)queue.push({edge:turn.to,first,cost:nextCost+4,depth:depth+1});
+    }
+    return best;
+  }
   function chooseMove(v, fromLane) {
+    if(v.responding){const next=pursuitTurn(v,fromLane);if(next)return next;}
     const e = v.edge;
     let total = 0;
     for (let k = 0; k < e.moves.length; k++) {
@@ -1795,6 +1828,7 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
       pe.rollVel -= (hit.nx * a.cos - hit.nz * a.sin) * kick * 0.2;
       pe.heaveVel += Math.min(0.7, kick * 0.06);
     }
+    if(pe.type==='car'&&v.isPolice&&speed>5.5)patrolImpact?.(speed);
     impact(v, -hit.nx, -hit.nz, hit.impulse / b.mass);
     if (pe.type !== 'person') crunch(pe, v, 0.58, speed);
   }
@@ -1850,7 +1884,8 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
     return true;
   }
 
-  function place(v, e, lane, s) {
+  function place(v, e, lane, s, preserve=false) {
+    if(!preserve){v.crush=null;v.doorAngle=0;v.responding=false;}
     v.streetWait=0; v.streetHeld=false; v.streetController=null; v.streetBusy=false; v.streetY=0; v.streetEmpty=false;
     v.edge = e;
     v.lane = lane;
@@ -2008,7 +2043,7 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
     }
 
     const L = lampState(c);
-    carAttributes.write(bodyInst, slot, c.paint, L[0], L[1], L[2], c.streetEmpty ? c.style+65536 : c.style);
+    carAttributes.write(bodyInst, slot, c.paint, L[0], L[1], L[2], c.streetEmpty ? c.style+65536 : c.style,c,rotY);
 
     // Soft Under-Car Contact Shadow (AO) stays flat on the asphalt, sized to the body kind
     const visIdx = visibleCars++;
@@ -2328,7 +2363,22 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
     group,
     update,
     setCollisionListener,
+    setPatrolImpact(listener){patrolImpact=listener;},
+    updateDispatch(level,x,z){
+      responseX=x;responseZ=z;
+      const patrols=cars.filter(v=>v.isPolice&&!v.streetHeld&&v.edge).sort((a,b)=>
+        Math.hypot(a.x-x,a.z-z)-Math.hypot(b.x-x,b.z-z));
+      const count=level?Math.min(patrols.length,1+Math.floor(level*.8)):0;
+      for(let i=0;i<patrols.length;i++){
+        const v=patrols[i],active=i<count;
+        if(active&&!v.responding&&!v.conn&&!v.commit){
+          v.responding=true;v.move=chooseMove(v,false);
+        }
+        v.responding=active;
+      }
+    },
     holdStreetCar(v) {
+      v.responding=false;
       v.edge=null; v.streetHeld=true; v.streetBusy=true; v.streetEmpty=true;
       v.yaw+=v.yawOffset; v.yawOffset=0; v.speed=v.vx=v.vz=v.acc=v.steer=0;
     },
@@ -2339,7 +2389,7 @@ function createTrafficSystem(scene, sidewalks, obstacles, signalIntersections) {
         return true;
       }
       const x=v.x,z=v.z;
-      place(v,spot.e,spot.lane,spot.s);
+      place(v,spot.e,spot.lane,spot.s,true);
       v.dl=(z-v.z)*v.tx-(x-v.x)*v.tz;
       locate(v);v.prevX=v.x;v.prevZ=v.z;v.speed=0;v.shaken=clock+.65;
       return true;
@@ -2498,6 +2548,8 @@ function createHighwayTraffic(scene, lanes) {
       const geo = lod === 2 ? buildCarProxyGeometry(spec) : buildCarGeometry(spec, lod === 0);
       geo.setAttribute('paintColor', new THREE.InstancedBufferAttribute(new Float32Array(n * 3), 3));
       geo.setAttribute('carState', new THREE.InstancedBufferAttribute(new Float32Array(n * 4), 4));
+      geo.setAttribute('carCrush',new THREE.InstancedBufferAttribute(new Float32Array(n*4),4));
+      geo.setAttribute('carPanels',new THREE.InstancedBufferAttribute(new Float32Array(n*4),4));
       const mesh = new THREE.InstancedMesh(geo, createLoftedCarMaterial(spec), n);
       mesh.count = 0;
       mesh.frustumCulled = false;

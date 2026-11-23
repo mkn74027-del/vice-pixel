@@ -1,6 +1,6 @@
 # VICE PIXEL — Manhattan
 
-[Spielen](https://mkn74027-del.github.io/vice-pixel/manhattan/?v=rides51)
+[Spielen](https://mkn74027-del.github.io/vice-pixel/manhattan/?v=impact62)
 
 Befahrbare Manhattan-Insel mit echter Straßengeometrie, Gebäudeflächen und -höhen, Küsten, Brücken, Stadtverkehr, Fußgängern und Wahrzeichen. Die Umgebung und der Renderer stammen aus [Slop New York](https://github.com/mrdoob/slop-newyork), MIT, Stand `7fdf054aa7a8b1c005983a855fb3b308f2d9a948`. Eigenständige Ergänzungen: drei Stadtaufträge, zeit- und fahrzeugabhängige Kontrollpunkte, Geldbelohnungen, F zum Ein-/Aussteigen ins eigene Taxi, gerichtetes A*-GPS auf dem Verkehrsnetz, deutsche Oberflächenanpassungen und km/h.
 
@@ -35,6 +35,8 @@ Automatische Spielstand- und Sound-Einstellungen werden nur in einer flüchtigen
 Während die Inselkarte geöffnet ist, pausieren Bewegung und Auftragstimer. Die Karte lässt sich ziehen, zoomen und nach Straßen oder Wahrzeichen durchsuchen. Klicken setzt ein GPS-Ziel und versetzt den Spieler nicht. Gelbe Linien folgen dem gerichteten Straßengraphen. Ist kein Straßenweg verfügbar, zeigt eine gestrichelte Linie nur die Richtung; im Heli wird die Luftlinie angezeigt. Explizite Schnellreise ist separat wählbar und beendet einen laufenden Auftrag.
 
 Fahrer können fliehen, sich wehren oder ihren Wagen zurückholen. Treffer werden an den Gelenken der Figuren ausgewertet. Unter **Tab → Blut & Gore** lassen sich die sichtbaren Effekte anpassen.
+
+Zusammenstöße verformen Front, Heck und Seiten jedes Stadtwagens separat. Das Spielmenü zeigt den Karosserieschaden für den gefahrenen Wagen. Fußgänger können seitlich aus der Fahrspur hechten. Ein bis fünf Fahndungssterne erscheinen bei Delikten, Streifenwagen suchen auf dem Straßennetz. Die Fahrer­tür besteht aus einem beweglichen Ausschnitt der Karosserie.
 
 ## Stadtaufträge
 

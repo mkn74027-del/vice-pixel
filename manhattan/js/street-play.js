@@ -1,15 +1,17 @@
+import {applyImpact,vehicleRay} from './car-damage.js';
 import * as THREE from 'three/webgpu';
 import { RAGDOLL_POINTS } from './ragdoll.js';
-import { createImpactEffects } from './street-effects.js?v=rides51';
+import { createImpactEffects } from './street-effects.js?v=impact62';
 
 const gear=[
   {name:'Fäuste',mag:0,interval:.44},
   {name:'Arcade-Pistole',mag:12,interval:.26},
   {name:'Impuls-MP',mag:24,interval:.13}
 ];
-export function createStreetPlay({scene,manager,cameraSystem,traffic,audio,map,canvas,selectMode}) {
+export function createStreetPlay({law,scene,manager,cameraSystem,traffic,audio,map,canvas,selectMode}) {
   const ground=(x,z)=>manager.getGroundHeight(x,z,'person');
-  const effects=createImpactEffects(scene,ground);
+  const effects=createImpactEffects(scene,ground,cameraSystem.camera);
+  const nativeTaxi=manager.entities.car, tires=new Map();
   const panel=document.getElementById('street-menu'), menuButton=document.getElementById('street-menu-button');
   const readout=document.getElementById('street-gear'), cross=document.getElementById('street-reticle');
   const blood=document.getElementById('street-blood'), message=document.getElementById('street-notice');
@@ -58,7 +60,13 @@ export function createStreetPlay({scene,manager,cameraSystem,traffic,audio,map,c
     if(locks())document.exitPointerLock();
   }
   function menu(open){
-    if(open){if(map.isFullMapOpen)map.toggleFullMap(false);stopInput();panel.showModal();manager.inputBlocked=true;}
+    if(open){
+      const car=manager.entities.car,inspection=document.getElementById('garage-inspection');
+      inspection.hidden=manager.activeMode!=='car';
+      const dents=(car.trafficCar||car).crush;
+      const pct=(...i)=>Math.round(100*Math.max(...i.map(k=>dents?.[k]||0)));
+      inspection.textContent='Karosserieschaden · Front '+pct(0,1)+' % · Heck '+pct(2,3)+' % · Seiten '+pct(4,5)+' %';
+      if(map.isFullMapOpen)map.toggleFullMap(false);stopInput();panel.showModal();manager.inputBlocked=true;}
     else if(panel.open)panel.close();
   }
   panel.addEventListener('keydown',e=>{
@@ -81,7 +89,7 @@ export function createStreetPlay({scene,manager,cameraSystem,traffic,audio,map,c
   });
   blood.addEventListener('change',()=>{
     const level=Number(blood.value);effects.setLevel(level);
-    if(level<2)for(const p of traffic.streetTargets)p.rig.streetWounds=0;
+    if(level<2){tires.clear();for(const p of traffic.streetTargets)p.rig.streetWounds=0;}
   });
   document.getElementById('street-look').addEventListener('click',()=>{
     menu(false);selectMode('person');
@@ -117,13 +125,20 @@ export function createStreetPlay({scene,manager,cameraSystem,traffic,audio,map,c
     if(trails.length>=16)trails.shift();
     trails.push({p,x,z,until:clock+3.6});
   }
-  traffic.setPersonImpactFeedback((p,m)=>{
+  traffic.setPersonImpactFeedback((p,m,joint,wheel)=>{
     const speed=Math.hypot(m.vx,m.vz),pose=p.ragdoll?.x;
     let zone=zones[9],best=Infinity;
     if(pose)for(const candidate of zones){
       const k=candidate.joint*3;
       const d=(pose[k]-m.x)**2+(pose[k+1]-(m.y+.58))**2+(pose[k+2]-m.z)**2;
       if(d<best){zone=candidate;best=d;}
+    }
+    if(joint!==undefined&&joint>=0)zone=zones.find(z=>z.joint===joint)||zone;
+    if(m.ref===manager.getActiveEntity()&&speed>3.8)law.report('vehicleHit',speed>9?32:18,1.35);
+    if(wheel&&speed>2.7&&blood.value==='2'){
+      const v=m.ref?.trafficCar||m.ref;
+      if(v){const side=(p.x-m.x)*Math.cos(m.heading)-(p.z-m.z)*Math.sin(m.heading);
+        tires.set(v,{x:m.x,z:m.z,side:side<0?-1:1,left:15,until:clock+30});}
     }
     const k=zone.joint*3;
     react(p,pose?.[k]??p.x,pose?.[k+1]??ground(p.x,p.z)+.8,pose?.[k+2]??p.z,m.vx,m.vz,speed>5,zone,true);
@@ -144,7 +159,7 @@ export function createStreetPlay({scene,manager,cameraSystem,traffic,audio,map,c
     if(!p.fall){if(!traffic.arcadeHit(p,dir.x,dir.z))return;}
     else if(heavy&&p.ragdoll&&p.fall.mode==='tumble'){p.ragdoll.wake();p.ragdoll.kick(dir.x,dir.z,1.6);}
     else return;
-    hits++;lastHitFlash=.18;
+    hits++;lastHitFlash=.18;law.report(heavy?'shotHit':'fight',heavy?24:16,.75);
     react(p,point?.x??p.x,point?.y??ground(p.x,p.z)+.92,point?.z??p.z,dir.x,dir.z,heavy,zone);
   }
   function swing(){
@@ -193,11 +208,19 @@ export function createStreetPlay({scene,manager,cameraSystem,traffic,audio,map,c
         best=entry;target=p;hitZone=z;
       }
     }
+    let vehicle=null;
+    for(const v of [nativeTaxi,...traffic.cars]){
+      if(v!==nativeTaxi&&!v.edge&&!v.streetHeld)continue;
+      const t=vehicleRay(v,ray,best);
+      if(t<best){best=t;target=null;vehicle=v;}
+    }
     ray.at(best,impact);
     muzzle.copy(person.position);muzzle.y+=1.25;
     aim.subVectors(impact,muzzle);const length=aim.length();aim.normalize();
     const cutoff=unobstructed(muzzle,aim,length);
-    if(cutoff<length-.30){target=null;impact.copy(muzzle).addScaledVector(aim,cutoff);}
+    if(cutoff<length-.30){target=null;vehicle=null;impact.copy(muzzle).addScaledVector(aim,cutoff);}
+    if(vehicle)applyImpact(vehicle,impact.x,impact.z,6,true);
+    law.report('gunfire',14,1.3);
     if(target)down(target,ray.direction,true,hitZone,impact);
     person.heading=Math.atan2(aim.x,aim.z);
     audio.streetSound('shot',muzzle.x,muzzle.y,muzzle.z,index-1);
@@ -261,7 +284,20 @@ export function createStreetPlay({scene,manager,cameraSystem,traffic,audio,map,c
         if(clock>t.until||!p.placed||!p.fall){trails.splice(i,1);continue;}
         if(Math.hypot(p.x-t.x,p.z-t.z)>.58){effects.trail(p.x,p.z);t.x=p.x;t.z=p.z;}
       }
-      if(dt>0)effects.update(dt);
+      if(dt>0){
+        for(const [v,t] of tires){
+          const x=v.position?.x??v.x,z=v.position?.z??v.z,yaw=v.heading??v.yaw;
+          const dist=Math.hypot(x-t.x,z-t.z);
+          if(clock>t.until||dist>10||t.left<=0||(!v.position&&!v.edge&&!v.streetHeld)){tires.delete(v);continue;}
+          if(dist<.19)continue;
+          const offset=(v.halfWidth||.92)*.78*t.side;
+          const count=Math.min(16,Math.ceil(dist/.23));
+          for(let i=1;i<=count;i++)effects.tire(t.x+(x-t.x)*i/count+Math.cos(yaw)*offset,
+            t.z+(z-t.z)*i/count-Math.sin(yaw)*offset,yaw,Math.max(0,t.left/15));
+          t.x=x;t.z=z;t.left-=dist;
+        }
+        effects.update(dt);
+      }
       if(noticeTime>0){noticeTime-=dt;if(noticeTime<=0)message.hidden=true;}
       lastHitFlash=Math.max(0,lastHitFlash-dt);cross.classList.toggle('hit',lastHitFlash>0);
       if (+readout.dataset.attacks !== attacks) readout.dataset.attacks=String(attacks);

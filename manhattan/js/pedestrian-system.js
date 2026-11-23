@@ -401,6 +401,55 @@ function createPedestrianSystem(network, { player, nearEdges, nearSignals, mayCr
     p.waiting = false;
   }
 
+  // Time to the front of the swept vehicle, measured in its velocity frame.
+  function diveThreat(p,m){
+    const speed=Math.hypot(m.vx,m.vz);
+    if(speed<6.2||!m.knocks)return null;
+    const fx=m.vx/speed,fz=m.vz/speed,dx=p.x-m.x,dz=p.z-m.z;
+    const lead=dx*fx+dz*fz,side=dx*fz-dz*fx;
+    const t=(lead-Math.max(m.shape.zFront,-m.shape.zRear)-.27)/speed;
+    const bodyVX=p.rig.vx||0,bodyVZ=p.rig.vz||0;
+    if(t<.055||t>.82||Math.abs(side+(bodyVX*fz-bodyVZ*fx)*t)>m.shape.xHalf+.39)return null;
+    const sign=Math.abs(side)<.11?(p.index%2?1:-1):Math.sign(side);
+    return {m,t,fx,fz,sx:fz*sign,sz:-fx*sign};
+  }
+  const dodgeContact={};
+  function jumpClear(p,dx,dz){
+    const candidates=world.colliders?.(p.x+dx,p.z+dz,2.6)||[];
+    for(const d of [.65,1.5,2.35]){
+      const x=p.x+dx*d,z=p.z+dz*d,y=world.ground(x,z)+.72;
+      for(const c of candidates)if(world.contact(c,x,y,z,.34,dodgeContact))return false;
+    }
+    return true;
+  }
+  function tryDive(p){
+    if(!p.rig.placed||p.fall||p.phase==='pull'||clock<(p.diveCheck||0)||clock<(p.diveAgain||0)||
+      Math.abs(p.x-focusX)>70||Math.abs(p.z-focusZ)>70)return false;
+    p.diveCheck=clock+.075+(p.index%5)*.011;
+    let best=null;
+    for(const m of movers){
+      if(Math.abs(p.x-m.x)>27||Math.abs(p.z-m.z)>27)continue;
+      const threat=diveThreat(p,m);if(threat&&(!best||threat.t<best.t))best=threat;
+    }
+    if(!best)return false;
+    if(!jumpClear(p,best.sx,best.sz)){
+      if(!jumpClear(p,-best.sx,-best.sz))return false;
+      best.sx*=-1;best.sz*=-1;
+    }
+    p.diveAgain=clock+3;
+    knockDown(p,{vx:best.sx*2,vz:best.sz*2,arcadeHit:true});
+    const velocity=p.ragdoll.v,jump=2.6+(p.index%7)*.115;
+    for(let j=0;j<velocity.length;j+=3){
+      const upper=j/3>=2&&j/3<=10;
+      const push=upper?5.45:2.55;
+      velocity[j]=best.sx*push+best.fx*.48;
+      velocity[j+1]=jump+(upper?.38:-.2);
+      velocity[j+2]=best.sz*push+best.fz*.48;
+    }
+    p.fall.dive=true;
+    return true;
+  }
+
   function avoidPlayer(p) {
     // A retreat is temporary: once clear, turn back toward the original destination instead of walking into
     // the people behind. Corner transitions below discard this old direction along with the escape boundary.
@@ -1033,7 +1082,7 @@ function createPedestrianSystem(network, { player, nearEdges, nearSignals, mayCr
       const p = peds[i];
       if (!p.placed) continue;
       if (p.fall) fallen.push(p);
-      else avoidPlayer(p);
+      else if(!tryDive(p))avoidPlayer(p);
     }
     for (let m = 0; m < movers.length; m++) movers[m].dt = dt;
     meet(dt);
@@ -1100,6 +1149,7 @@ function createPedestrianSystem(network, { player, nearEdges, nearSignals, mayCr
       else {fallen.push(p);updateFall(p,dt);return;}
     }
     if(p.phase!=='pull'){
+      if(tryDive(p)){updateFall(p,dt);return;}
       const hit=struck(p);if(hit){knockDown(p,hit);updateFall(p,dt);return;}
     }
     p.rig.update(dt,p.x,p.z,p.heading,worldGround,p,p.seatOffset||0,true);
@@ -1151,6 +1201,7 @@ function createPedestrianSystem(network, { player, nearEdges, nearSignals, mayCr
     }
     ragdoll.wake();
     const f = p.fall || (p.fall = p.fallState || (p.fallState = { mode: '', time: 0, lie: 0, start: 0, x: 0, z: 0, yaw: 0, ground: 0, rise: null, pose: null }));
+    f.dive=false;f.lastImpact=clock-.38;
     f.mode = 'tumble';
     f.time = 0;
     f.lie = 0;
@@ -1174,13 +1225,19 @@ function createPedestrianSystem(network, { player, nearEdges, nearSignals, mayCr
     const draw = !hasView || visible(p.x, p.z, 7);
     f.time += dt;
     if (f.mode === 'tumble') {
-      if (distSq < RAGDOLL_RANGE * RAGDOLL_RANGE) ragdoll.step(dt, world, movers);
+      if (distSq < RAGDOLL_RANGE * RAGDOLL_RANGE){
+        ragdoll.step(dt,world,movers);
+        if(ragdoll.strikeMover&&clock-f.lastImpact>.49){
+          f.lastImpact=clock;
+          onHit?.(p,ragdoll.strikeMover,ragdoll.strikeJoint,ragdoll.strikeWheel);
+        }
+      }
       p.x = ragdoll.pelvisX;
       p.z = ragdoll.pelvisZ;
       if (draw) rig.fromRagdoll(ragdoll.x);
       // lie still a while (not on top of a car, nor under one), then get up
       f.lie = ragdoll.asleep ? f.lie + dt : 0;
-      const wait = Math.min(LIE_MAX, LIE_MIN + ragdoll.impact * 0.22);
+      const wait = f.dive ? .42 : Math.min(LIE_MAX,LIE_MIN+ragdoll.impact*.22);
       if (!p.streetInjury && (f.lie > wait || f.time > LIE_LIMIT) && !ragdoll.contact.includes(2) && !ragdoll.covered(movers)) startRise(p);
     } else if (f.mode === 'rise') {
       const t = clock - f.start;

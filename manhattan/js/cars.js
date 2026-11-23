@@ -1,3 +1,4 @@
+import {splitDriverDoor,noMovingDoor} from './driver-door.js';
 import * as THREE from 'three/webgpu';
 import { cityUniforms } from './tsl-materials.js';
 import {
@@ -34,7 +35,7 @@ import {
   normalize,
   select,
   normalView,
-  positionView,
+  positionView, positionLocal,
   positionViewDirection,
   uniform,
   texture,
@@ -1208,7 +1209,7 @@ function buildCarGeometry(spec, includeWheels = true) {
   if (spec.rails) parts.push(...buildRoofRails(spec));
   if (spec.bedCover) parts.push(...buildBedCover(spec));
   if (spec.sign) parts.push(...buildTaxiSign(spec));
-  return mergeGeometries(parts);
+  return splitDriverDoor(mergeGeometries(parts),spec);
 }
 
 // A ~250-triangle stand-in for distant cars (a few pixels tall): the same body & glasshouse lofted from a handful of
@@ -1230,7 +1231,7 @@ function buildCarProxyGeometry(spec) {
     const box = new THREE.BoxGeometry(TOPPER.base + TOPPER.top, TOPPER.height, TOPPER.length);
     parts.push(part(box.translate(0, y + TOPPER.lift + TOPPER.height / 2, z), CAR_PARTS.SIGN));
   }
-  return mergeGeometries(parts);
+  return noMovingDoor(mergeGeometries(parts));
 }
 
 // NYPD roof light bar (red on the -x half, blue on the +x half) for a body spec's roof, lit by createLightbarMaterial
@@ -1619,6 +1620,15 @@ function createCarWheelMaterial({ instanced = false, style = 0, wheelRadius = BO
 
   const mat = new THREE.MeshStandardNodeMaterial();
   mat.envMapIntensity = 1.35;
+  if(fixed){
+    mat.positionNode=positionLocal.add(move);
+    mat.userData.panelState=sideDents;mat.userData.crushState=dents;
+  }else{
+    // positionLocal already includes the instance transformation in this renderer.
+    const yaw=sideDents.w;
+    mat.positionNode=positionLocal.add(vec3(move.x.mul(cos(yaw)).add(move.z.mul(sin(yaw))),move.y,
+      move.z.mul(cos(yaw)).sub(move.x.mul(sin(yaw)))));
+  }
   mat.colorNode = colorFn();
   mat.roughnessNode = mix(float(0.78), mix(float(0.22), float(0.52), isPolice), isAlloy);
   mat.metalnessNode = mix(float(0.04), mix(float(0.84), float(0.22), isPolice), isAlloy);
@@ -2382,6 +2392,26 @@ function createLoftedCarMaterial(spec, fixedColorHex = null) {
   // ---- The surface: per-part If branches, so each fragment only evaluates its own part's masks, each once for its
   // colour, roughness, metalness & emissive ---------------------------------------------------------------------------
   const CarSurface = struct({ color: 'vec3', roughness: 'float', metalness: 'float', emissive: 'vec3' }, 'CarSurface');
+
+  const dents=fixed?uniform(new THREE.Vector4()):attribute('carCrush','vec4');
+  const sideDents=fixed?uniform(new THREE.Vector4()):attribute('carPanels','vec4');
+  const left=smoothstep(-.57,.57,p.x);
+  const frontCrush=mix(dents.y,dents.x,left).mul(smoothstep(.19,spec.zFront-.12,p.z));
+  const rearCrush=mix(dents.w,dents.z,left).mul(smoothstep(.25,-spec.zRear-.12,p.z.negate()));
+  const sideCrush=mix(sideDents.y,sideDents.x,left).mul(smoothstep(.39,.84,abs(p.x)))
+    .mul(float(1).sub(smoothstep(.66,1.85,abs(p.z))));
+  const stress=max(sideCrush,max(frontCrush,rearCrush));
+  const crease=sin(p.x.mul(14).add(p.z.mul(7.5))).mul(.5).add(.5);
+  const hingeX=spec.wheelX+.07,hingeZ=spec.doors[0];
+  const angle=sideDents.z.mul(attribute('doorVertex','float'));
+  const hx=p.x.sub(hingeX),hz=p.z.sub(hingeZ);
+  const doorX=hx.mul(cos(angle).sub(1)).add(hz.mul(sin(angle)));
+  const doorZ=hz.mul(cos(angle).sub(1)).sub(hx.mul(sin(angle)));
+  const deformX=sideCrush.mul(-.41).mul(p.x.sign()).add(stress.mul(crease).mul(.062).mul(p.x.sign()));
+  const deformY=frontCrush.mul(.22).add(rearCrush.mul(.13)).mul(crease.add(.36)).sub(sideCrush.mul(.07));
+  const deformZ=rearCrush.mul(.80).sub(frontCrush.mul(.91));
+  const move=vec3(deformX.add(doorX),deformY,deformZ.add(doorZ));
+
   const surfaceFn = Fn(() => {
     const outCol = vec3(color(0x181b1f)).toVar();
     const rough = float(0.78).toVar();
@@ -2599,6 +2629,23 @@ function createLoftedCarMaterial(spec, fixedColorHex = null) {
       emit.assign(topperCol.mul(topper.panel.mul(nightHeadlamp.mul(0.9).add(0.3)).add(topper.end.mul(0.7))));
     });
 
+    const scar=stress.mul(smoothstep(.18,.78,stress));
+    const scratches=sin(p.z.mul(196).add(sin(p.y.mul(77))).add(p.x.mul(63))).mul(.5).add(.5);
+    const scrape=smoothstep(.66,.94,scratches).mul(scar).mul(smoothstep(.30,.68,abs(n.x).add(abs(n.z))));
+    outCol.assign(mix(outCol,color(0x646569),scrape.mul(.8)));
+    rough.assign(max(rough,scrape.mul(.88)));
+    emit.assign(emit.mul(float(1).sub(smoothstep(.25,.66,stress))));
+    const crackForce=max(mix(dents.y,dents.x,left).mul(smoothstep(-.45,.50,p.z)),
+      max(mix(dents.w,dents.z,left).mul(smoothstep(.5,-.8,p.z)),sideCrush));
+    If(isWindow.greaterThan(.5).and(crackForce.greaterThan(.2)),()=>{
+      const glassMask=evalWindowGlass().glass;
+      const u=p.x.add(p.z.mul(.74)).mul(9.4),v=p.y.mul(10.7).add(sin(u.mul(.87)).mul(.68));
+      const fissure=min(abs(fract(u.add(v.mul(.41))).sub(.5)),abs(fract(v.sub(u.mul(.61))).sub(.5)));
+      const cracks=float(1).sub(smoothstep(.009,.049,fissure));
+      const amount=smoothstep(.20,.68,crackForce).mul(glassMask);
+      outCol.assign(mix(outCol,color(0xb7c8cc),amount.mul(cracks.mul(.8).add(.065))));
+      rough.assign(max(rough,amount.mul(.46)));
+    });
     return CarSurface(outCol, rough, metal, emit);
   });
 

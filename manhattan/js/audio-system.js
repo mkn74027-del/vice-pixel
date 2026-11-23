@@ -1,5 +1,5 @@
 import { createSynthResources, createMotorVoice, setControlRate } from './audio-synthesis.js';
-import { createEventResources, playEvent, createWindVoice } from './audio-events.js?v=rides51';
+import { createEventResources, playEvent, createWindVoice } from './audio-events.js?v=impact62';
 import { CityAudioSources } from './audio-sources.js';
 import { CityAcoustics } from './audio-acoustics.js';
 

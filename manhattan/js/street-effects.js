@@ -1,12 +1,12 @@
 import * as THREE from 'three/webgpu';
 
 // Recycle world-space effects. Even at the highest setting there are three instanced draws.
-export function createImpactEffects(scene, ground) {
+export function createImpactEffects(scene, ground, camera) {
   const root = new THREE.Group();
   scene.add(root);
   const transform=new THREE.Object3D(), tint=new THREE.Color();
-  function pool(geometry, capacity) {
-    const material=new THREE.MeshStandardNodeMaterial({color:0xffffff,roughness:0.79});
+  function pool(geometry, capacity, custom=null) {
+    const material=custom||new THREE.MeshStandardNodeMaterial({color:0xffffff,roughness:0.79});
     const mesh=new THREE.InstancedMesh(geometry,material,capacity);
     mesh.setColorAt(0,new THREE.Color(0xffffff));
     mesh.count=0;
@@ -27,9 +27,27 @@ export function createImpactEffects(scene, ground) {
   }
   const stainGeometry=new THREE.ShapeGeometry(outline);
   stainGeometry.rotateX(-Math.PI/2);
-  const droplets=pool(new THREE.IcosahedronGeometry(1,0),320);
-  const debris=pool(new THREE.DodecahedronGeometry(1,0),88);
-  const stains=pool(stainGeometry,220);
+  const droplets=pool(new THREE.IcosahedronGeometry(1,0),540);
+  const debris=pool(new THREE.DodecahedronGeometry(1,0),136);
+  const stains=pool(stainGeometry,440,new THREE.MeshStandardNodeMaterial({color:0xffffff,roughness:.34,metalness:.04}));
+  // A soft, short-lived spray sits behind the heavier ballistic drops.
+  const canvas=document.createElement('canvas');canvas.width=canvas.height=64;
+  const ctx=canvas.getContext('2d'),gradient=ctx.createRadialGradient(32,32,1,32,32,31);
+  gradient.addColorStop(0,'rgba(255,255,255,.60)');gradient.addColorStop(.42,'rgba(255,255,255,.38)');
+  gradient.addColorStop(1,'rgba(255,255,255,0)');ctx.fillStyle=gradient;ctx.fillRect(0,0,64,64);
+  const cloud=pool(new THREE.PlaneGeometry(1,1),64,new THREE.MeshBasicNodeMaterial({
+    map:new THREE.CanvasTexture(canvas),transparent:true,depthWrite:false,opacity:.74,side:THREE.DoubleSide
+  }));
+  const tread=pool(new THREE.PlaneGeometry(1,1).rotateX(-Math.PI/2),300,new THREE.MeshStandardNodeMaterial({roughness:.47}));
+  function tire(x,z,yaw,wetness){
+    if(level!==2)return;
+    const sideX=Math.cos(yaw),sideZ=-Math.sin(yaw);
+    for(let i=-1;i<=1;i++){
+      const d=i*.052;
+      add(tread,{x:x+sideX*d,z:z+sideZ*d,y:ground(x,z)+.029,angle:yaw+i*.19,size:.028+wetness*.026,
+        color:wetness>.5?0x721321:0x4b1822,age:0,life:40+wetness*26});
+    }
+  }
   const separated=[], wounds=[];
   const wet=new THREE.MeshStandardNodeMaterial({color:0x791c26,roughness:.38});
   const edgeMat=new THREE.MeshStandardNodeMaterial({color:0x933040,roughness:.55});
@@ -82,7 +100,7 @@ export function createImpactEffects(scene, ground) {
       const mesh=new THREE.Mesh(round,wet);root.add(mesh);w={mesh};wounds.push(w);
     }
     if(!w)w=wounds.reduce((a,b)=>a.life<b.life?a:b);
-    Object.assign(w,{p,joint,life:8,tick:0,instance:p.streetGeneration||0});
+    Object.assign(w,{p,joint,life:12,tick:0,instance:p.streetGeneration||0});
     w.mesh.visible=true;w.mesh.scale.set(.082,.099,.077);
   }
   function bleed(w,dt){
@@ -94,30 +112,39 @@ export function createImpactEffects(scene, ground) {
     const a=p.ragdoll.x,k=w.joint*3,x=a[k],y=a[k+1],z=a[k+2];
     w.mesh.position.set(x,y,z);
     if((w.tick-=dt)>0)return;
-    w.tick=.17+Math.random()*.23;
+    w.tick=.11+Math.random()*.22;
     add(droplets,{x,y,z,vx:Math.random()-.5,vy:.4+Math.random()*.5,vz:Math.random()-.5,
       size:.027,angle:0,spin:2,age:0,life:1.7,color:0x861321,landed:false});
-    if(y-ground(x,z)<.52)stain(x+(Math.random()-.5)*.2,z+(Math.random()-.5)*.2,.16+(8-w.life)*.055,1.18);
+    if(y-ground(x,z)<.52)stain(x+(Math.random()-.5)*.2,z+(Math.random()-.5)*.2,.16+(12-w.life)*.057,1.18);
   }
   let level=2;
   function stain(x,z,size,stretch=1) {
     add(stains,{x,y:ground(x,z)+.026+Math.random()*.012,z,size,stretch,
-      angle:Math.random()*Math.PI*2,age:0,life:level===2?47:19,color:Math.random()>.45?0x741020:0x9e1826});
+      angle:Math.random()*Math.PI*2,age:0,life:level===2?77:19,color:Math.random()>.45?0x741020:0x9e1826});
   }
   function burst(x,y,z,dx,dz,strong) {
     if(level===0)return;
-    const many=level===2, amount=many?(strong?66:40):12;
+    const many=level===2, amount=many?(strong?116:51):12;
+    if(many){
+      const heading=Math.atan2(dx,dz),n=strong?8:3;
+      for(let i=0;i<n;i++){
+        const a=heading+(Math.random()-.5)*1.65,speed=1.2+Math.random()*3.5;
+        add(cloud,{x,y,z,vx:Math.sin(a)*speed,vz:Math.cos(a)*speed,vy:.5+Math.random()*1.1,
+          age:0,life:.27+Math.random()*.35,size:.35+Math.random()*.47,color:i%2?0xa71b30:0x720a20});
+      }
+    }
     const magnitude=Math.hypot(dx,dz)||1;
     for(let i=0;i<amount;i++){
-      const a=Math.random()*Math.PI*2, speed=(many?5.5:2.3)*Math.random();
+      const a=i%3?Math.atan2(dz,dx)+(Math.random()-.5)*(many?1.7:2.7):Math.random()*Math.PI*2;
+      const speed=(many?7.3:2.3)*Math.random();
       const piece=many&&i%7===0;
       const vx=Math.cos(a)*speed+dx/magnitude*(strong?2.1:1.1), vz=Math.sin(a)*speed+dz/magnitude*(strong?2.1:1.1);
       add(piece?debris:droplets,{x,y:y+Math.random()*.22,z,vx,vy:1.2+Math.random()*(many?4.8:2.8),vz,
         size:(piece?.11:.042)*(1+Math.random()*1.25),angle:a,spin:Math.random()*8-4,landed:false,
         age:0,life:piece?7:1.9,color:piece?(i%2?0x8f2437:0xb84651):(i%3?0xb7192b:0x770720)});
     }
-    stain(x,z,many?(strong?1.35:.85):.37);
-    if(many)for(let i=0;i<12;i++){
+    stain(x,z,many?(strong?1.75:.90):.37);
+    if(many)for(let i=0;i<(strong?20:10);i++){
       const a=Math.random()*Math.PI*2,r=Math.random()*(strong?2.6:1.7);
       stain(x+Math.cos(a)*r,z+Math.sin(a)*r,.08+Math.random()*.24,1.1+Math.random());
     }
@@ -150,10 +177,18 @@ export function createImpactEffects(scene, ground) {
     const size=p.size*Math.min(1,(p.life-p.age)*3);
     write(group,index,p,size,size*(group===debris?.72:1.65),size*.8,p.angle,p.angle*.7,0);
   }
-  return {burst,wound,separate:releasePart,trail(x,z){if(level===2)stain(x,z,.2+Math.random()*.22,1.7);},
-    setLevel(value){level=value;if(value<2){for(const piece of separated)piece.node.visible=false;for(const w of wounds)w.mesh.visible=false;}if(!value)for(const group of [stains,droplets,debris]){group.items.length=0;group.mesh.count=0;}},
+  return {burst,wound,tire,separate:releasePart,trail(x,z){if(level===2)stain(x,z,.2+Math.random()*.22,1.7);},
+    setLevel(value){level=value;if(value<2){for(const g of [tread,cloud,debris]){g.items.length=0;g.mesh.count=0;}for(const piece of separated)piece.node.visible=false;for(const w of wounds)w.mesh.visible=false;}if(!value)for(const group of [stains,droplets,debris]){group.items.length=0;group.mesh.count=0;}},
     update(dt){
       for(const w of wounds)bleed(w,dt);
+      render(tread,dt,(p,i)=>write(tread,i,p,p.size,1,.16*Math.min(1,p.life-p.age),0,p.angle,0));
+      render(cloud,dt,(p,i)=>{
+        p.x+=dt*p.vx;p.y+=dt*p.vy;p.z+=dt*p.vz;
+        const age=p.age/p.life,scale=p.size*(.6+age*2)*(1-age);
+        transform.position.set(p.x,p.y,p.z);transform.quaternion.copy(camera.quaternion);
+        transform.scale.set(scale*1.5,scale,1);transform.updateMatrix();cloud.mesh.setMatrixAt(i,transform.matrix);
+        tint.setHex(p.color);cloud.mesh.setColorAt(i,tint);
+      });
       render(droplets,dt,(p,i,d)=>move(droplets,p,i,d));
       render(debris,dt,(p,i,d)=>move(debris,p,i,d));
       render(stains,dt,(p,i)=>{const k=p.size*Math.min(1,.46+p.age*2.2,(p.life-p.age)*.6);

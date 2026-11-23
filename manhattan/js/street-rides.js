@@ -1,3 +1,4 @@
+import {createHoodSmoke} from './hood-smoke.js';
 import * as THREE from 'three/webgpu';
 import { Ragdoll, RAGDOLL_POINTS } from './ragdoll.js';
 import { PRONE_RISE, SUPINE_RISE, RISE_BLEND } from './pedestrians.js';
@@ -8,28 +9,27 @@ function beside(v,outward,along=.32){
   const yaw=yawOf(v),c=Math.cos(yaw),s=Math.sin(yaw);
   return {x:v.x+c*outward+s*along,z:v.z-s*outward+c*along};
 }
-export function createStreetRides({manager,traffic,selectMode,camera,scene,audio}){
+export function createStreetRides({law,manager,traffic,selectMode,camera,scene,audio}){
   const person=manager.entities.person, taxi=manager.entities.car;
   const bar=document.querySelector('#ride-context'), toast=document.querySelector('#ride-notice');
   const ghost=new THREE.Object3D(), pivot=new THREE.Object3D();
   ghost.add(pivot);
   const controllable={...taxi,mesh:ghost,chassisPivot:pivot,position:taxi.position.clone(),headLights:[],wheels:[],carState:null};
-  const door=new THREE.Group(),hinge=new THREE.Group();
-  const paint=new THREE.MeshStandardNodeMaterial({roughness:.35,metalness:.35});
-  const lining=new THREE.MeshStandardNodeMaterial({color:0x252b31,roughness:.86});
-  const glass=new THREE.MeshStandardNodeMaterial({color:0x536b79,roughness:.18,metalness:.5});
-  function panel(parent,mat,x,y,z,w,h,l){
-    const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,l),mat);m.position.set(x,y,z);parent.add(m);return m;
+  const smoke=createHoodSmoke(scene,camera.camera);
+  const swings=new Map();
+  function swingDoor(v){if(v)swings.set(v,.97);}
+  function updateDoors(dt){
+    for(const [v,time] of swings){
+      const next=time-dt;
+      if(next<=0){v.doorAngle=0;swings.delete(v);continue;}
+      const t=1-next/.97;v.doorAngle=-1.12*Math.sin(Math.PI*t)**.86;swings.set(v,next);
+    }
+    const d=taxi.crush,mat=taxi.bodyMaterial;
+    mat.userData.crushState.value.set(d?.[0]||0,d?.[1]||0,d?.[2]||0,d?.[3]||0);
+    mat.userData.panelState.value.set(d?.[4]||0,d?.[5]||0,taxi.doorAngle||0,0);
+    const decal=taxi.chassisPivot.getObjectByName('DriverDoorDecal');
+    if(decal)decal.visible=Math.abs(taxi.doorAngle||0)<.015;
   }
-  door.add(hinge);
-  panel(hinge,paint,0,.66,-.49,.075,.49,.98);
-  panel(hinge,lining,-.043,.67,-.49,.018,.44,.92);
-  panel(hinge,glass,-.025,1.07,-.49,.035,.34,.94);
-  panel(hinge,lining,-.035,1.25,-.49,.044,.045,.97);
-  panel(hinge,lining,0,1.07,-.95,.055,.39,.045);
-  panel(hinge,lining,0,1.07,-.04,.055,.39,.045);
-  panel(hinge,lining,.047,.84,-.77,.025,.05,.16);
-  scene.add(door);door.visible=false;
   let pull=null,driven=null,noticeTime=0,sample=0,initialized=false;
   function notice(text){toast.textContent=text;toast.hidden=false;noticeTime=3;}
   function doorDistance(v){
@@ -73,6 +73,7 @@ export function createStreetRides({manager,traffic,selectMode,camera,scene,audio
     if(pull&&mode!=='person')cancelPull();
     if(mode!=='person')person.playerFall=null;
     if(manager.activeMode!=='car'||mode==='car')return;
+    swingDoor(driven||taxi);
     const c=manager.entities.car,side=(driven?.halfWidth||.95)+1.45;
     if(mode==='person')standAt(c.position.x+Math.cos(c.heading)*side,c.position.z-Math.sin(c.heading)*side,c.heading);
     if(driven){
@@ -86,7 +87,7 @@ export function createStreetRides({manager,traffic,selectMode,camera,scene,audio
     const {v,p}=pull;
     if(p.phase==='pull'){p.placed=false;if(!traffic.returnStreetCar(v)){v.streetBusy=false;v.streetEmpty=true;}}
     else v.streetBusy=false;
-    person.streetPull=false;person.rig.streetReach=0;door.visible=false;pull=null;
+    person.streetPull=false;person.rig.streetReach=0;v.doorAngle=0;pull=null;
   }
   const ground=(_,x,z)=>manager.getGroundHeight(x,z,'person');
   const fallWorld={ground:(x,z)=>ground(null,x,z),colliders:(x,z,r)=>manager.nearColliders(x,z,r),
@@ -133,7 +134,7 @@ export function createStreetRides({manager,traffic,selectMode,camera,scene,audio
     if(manager.activeMode!=='person')return;
     const v=nearby();
     if(!v){notice('Geh neben die Tür eines stehenden oder langsam rollenden Autos.');return;}
-    if(v===taxi||(v.streetHeld&&v.streetEmpty)){board(v);return;}
+    if(v===taxi||(v.streetHeld&&v.streetEmpty)){swingDoor(v);board(v);return;}
     const seat=beside(v,v.halfWidth*.54),p=traffic.startDriver(v,seat.x,seat.z,yawOf(v));
     if(!p){notice('Hier ist gerade zu viel los.');return;}
     traffic.holdStreetCar(v);v.streetOwner=p;
@@ -148,9 +149,7 @@ export function createStreetRides({manager,traffic,selectMode,camera,scene,audio
     for(let i=1;i<path.length;i++){length+=Math.hypot(path[i].x-path[i-1].x,path[i].z-path[i-1].z);path[i].distance=length;}
     pull={p,v,time:0,path,length,approach:Math.max(.20,length/5.8)};
     person.streetPull=true;manager.resetInput();
-    paint.color.setRGB(...v.paint);door.visible=true;
-    const a=beside(v,v.halfWidth,.83);
-    door.position.set(a.x,manager.getGroundHeight(v.x,v.z,'car'),a.z);door.rotation.y=yawOf(v);
+    swings.delete(v);v.doorAngle=0;
     bar.hidden=true;
   }
   function animatePull(dt){
@@ -164,20 +163,20 @@ export function createStreetRides({manager,traffic,selectMode,camera,scene,audio
       const f=Math.min(1,(dist-start)/Math.max(.001,b.distance-start));
       person.position.x=a.x+(b.x-a.x)*f;person.position.z=a.z+(b.z-a.z)*f;
       person.position.y=ground(null,person.position.x,person.position.z);
-      person.heading=Math.atan2(b.x-a.x,b.z-a.z);hinge.rotation.y=0;door.visible=false;return;
+      person.heading=Math.atan2(b.x-a.x,b.z-a.z);v.doorAngle=0;return;
     }
-    door.visible=true;
+
     const spot=path[path.length-1];
     person.position.x=spot.x;person.position.z=spot.z;person.heading=yawOf(v)-Math.PI/2;
     person.rig.streetReach=Math.sin(Math.PI*Math.min(1,t/1.15));
-    hinge.rotation.y=-1.03*Math.min(1,t/.3,(1.48-t)/.36);
-    door.updateMatrixWorld();
+    const phase=Math.max(0,Math.min(1,t/.35,(1.48-t)/.36));
+    v.doorAngle=-1.16*phase*phase*(3-2*phase);
     if(p.phase==='pull'){
       const u=Math.max(0,Math.min(1,(t-.23)/.54)),q=beside(v,side*.54+(side*.46+1.15)*u,.32-.22*u);
       p.x=q.x;p.z=q.z;p.heading=yawOf(v)+1.8*u;p.seatOffset=-.44*(1-u);
-      if(t>=.8){p.seatOffset=0;traffic.dropDriver(p,Math.cos(yawOf(v))*2.8,-Math.sin(yawOf(v))*2.8);}
+      if(t>=.8){law.report('theft',v.isPolice?54:22,1.5);p.seatOffset=0;traffic.dropDriver(p,Math.cos(yawOf(v))*2.8,-Math.sin(yawOf(v))*2.8);}
     }
-    if(t>=1.48){door.visible=false;pull=null;person.rig.streetReach=0;board(v);}
+    if(t>=1.48){v.doorAngle=0;pull=null;person.rig.streetReach=0;board(v);}
   }
   function ownerMoves(p,dt){
     if(!p.placed||p.phase==='pull'||pull?.p===p)return;
@@ -239,6 +238,7 @@ export function createStreetRides({manager,traffic,selectMode,camera,scene,audio
   }
   return {interact,leaving,initialize,get busy(){return !!pull;},update(dt){
     if(!dt)return;
+    updateDoors(dt);smoke(dt,traffic,taxi);
     if(pull)animatePull(dt);
     animatePlayerFall(dt);
     for(const p of traffic.drivers)ownerMoves(p,dt);

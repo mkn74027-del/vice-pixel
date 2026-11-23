@@ -11,15 +11,20 @@
   <script type="importmap">
     {
       "imports": {
-        "./js/cars.js": "./js/cars.js?v=rides51",
-        "./js/cameras.js": "./js/cameras.js?v=rides51",
-        "./js/pedestrians.js": "./js/pedestrians.js?v=rides51",
-        "./js/traffic.js": "./js/traffic.js?v=rides51",
-        "./js/pedestrian-system.js": "./js/pedestrian-system.js?v=rides51",
-        "./js/audio-system.js": "./js/audio-system.js?v=rides51",
-        "./js/audio-events.js": "./js/audio-events.js?v=rides51",
-        "./js/controllers.js": "./js/controllers.js?v=rides51",
-        "./js/vice-contracts.js": "./js/vice-contracts.js?v=rides51",
+        "./js/ragdoll.js": "./js/ragdoll.js?v=impact62",
+        "./js/driver-door.js": "./js/driver-door.js?v=impact62",
+        "./js/car-damage.js": "./js/car-damage.js?v=impact62",
+        "./js/hood-smoke.js": "./js/hood-smoke.js?v=impact62",
+        "./js/dispatch.js": "./js/dispatch.js?v=impact62",
+        "./js/cars.js": "./js/cars.js?v=impact62",
+        "./js/cameras.js": "./js/cameras.js?v=impact62",
+        "./js/pedestrians.js": "./js/pedestrians.js?v=impact62",
+        "./js/traffic.js": "./js/traffic.js?v=impact62",
+        "./js/pedestrian-system.js": "./js/pedestrian-system.js?v=impact62",
+        "./js/audio-system.js": "./js/audio-system.js?v=impact62",
+        "./js/audio-events.js": "./js/audio-events.js?v=impact62",
+        "./js/controllers.js": "./js/controllers.js?v=impact62",
+        "./js/vice-contracts.js": "./js/vice-contracts.js?v=impact62",
         "three": "https://cdn.jsdelivr.net/gh/mrdoob/three.js@8b92052852735b67cfa8393f78e707b3f07a0eec/build/three.webgpu.js",
         "three/webgpu": "https://cdn.jsdelivr.net/gh/mrdoob/three.js@8b92052852735b67cfa8393f78e707b3f07a0eec/build/three.webgpu.js",
         "three/tsl": "https://cdn.jsdelivr.net/gh/mrdoob/three.js@8b92052852735b67cfa8393f78e707b3f07a0eec/build/three.tsl.js",
@@ -39,13 +44,13 @@
   <link rel="modulepreload" href="./js/tree-geodata.js" />
   <link rel="preload" href="./js/tree-geodata.bin.gz" as="fetch" crossorigin />
   <link rel="modulepreload" href="./js/vehicles.js" />
-  <link rel="modulepreload" href="./js/cars.js?v=rides51" />
+  <link rel="modulepreload" href="./js/cars.js?v=impact62" />
   <link rel="modulepreload" href="./js/bus.js" />
   <link rel="modulepreload" href="./js/helicopter.js" />
   <link rel="modulepreload" href="./js/vehicle-lights.js" />
   <link rel="modulepreload" href="./js/vehicle-physics.js" />
-  <link rel="modulepreload" href="./js/pedestrians.js?v=rides51" />
-  <link rel="modulepreload" href="./js/ragdoll.js" />
+  <link rel="modulepreload" href="./js/pedestrians.js?v=impact62" />
+  <link rel="modulepreload" href="./js/ragdoll.js?v=impact62" />
   <link rel="modulepreload" href="./js/lighting.js" />
   <link rel="modulepreload" href="./js/city-grid.js" />
   <link rel="modulepreload" href="./js/boroughs.js" />
@@ -63,26 +68,26 @@
   <link rel="modulepreload" href="./js/subway-entrances.js" />
   <link rel="modulepreload" href="./js/road-network.js" />
   <link rel="modulepreload" href="./js/road-paint.js" />
-  <link rel="modulepreload" href="./js/traffic.js?v=rides51" />
-  <link rel="modulepreload" href="./js/pedestrian-system.js?v=rides51" />
+  <link rel="modulepreload" href="./js/traffic.js?v=impact62" />
+  <link rel="modulepreload" href="./js/pedestrian-system.js?v=impact62" />
   <link rel="modulepreload" href="./js/pedestrian-routes.js" />
-  <link rel="modulepreload" href="./js/controllers.js?v=rides51" />
+  <link rel="modulepreload" href="./js/controllers.js?v=impact62" />
   <link rel="modulepreload" href="./js/touch-controls.js" />
   <link rel="modulepreload" href="./js/gamepad-controls.js" />
-  <link rel="modulepreload" href="./js/cameras.js?v=rides51" />
+  <link rel="modulepreload" href="./js/cameras.js?v=impact62" />
   <link rel="modulepreload" href="./js/nyc-map.js?v=manhattan-3" />
   <link rel="modulepreload" href="./js/scene-culling.js" />
   <link rel="modulepreload" href="./js/post-processing.js" />
   <link rel="modulepreload" href="./js/audio-synthesis.js" />
-  <link rel="modulepreload" href="./js/audio-events.js?v=rides51" />
+  <link rel="modulepreload" href="./js/audio-events.js?v=impact62" />
   <link rel="modulepreload" href="./js/audio-sources.js" />
   <link rel="modulepreload" href="./js/audio-acoustics.js" />
-  <link rel="modulepreload" href="./js/audio-system.js?v=rides51" />
+  <link rel="modulepreload" href="./js/audio-system.js?v=impact62" />
   <link rel="modulepreload" href="./js/main.js" />
   <script>window.__viceStorage=(()=>{const memory=new Map();return {getItem:key=>memory.get(key)??null,setItem:(key,value)=>memory.set(key,String(value)),removeItem:key=>memory.delete(key)};})();</script>
-  <script type="module" src="./js/main.js?v=rides51"></script>
+  <script type="module" src="./js/main.js?v=impact62"></script>
   <!-- Inter (UI) & Overpass (street-name signs: modelled on Highway Gothic, the US road sign typeface) -->
-  <link rel="stylesheet" href="./css/style.css?v=rides51" />
+  <link rel="stylesheet" href="./css/style.css?v=impact62" />
 </head>
 <body>
   <!-- Icon sprite (24 × 24 stroke icons, drawn in currentColor) -->
@@ -341,13 +346,14 @@
   </section>
 
 <a class="vice-credits" href="https://github.com/mkn74027-del/vice-pixel/tree/main/manhattan#credits" target="_blank" rel="noopener">Stadt: Slop New York (MIT) · NYC / MTA · © OpenStreetMap</a>
-<div id="ride-context" hidden></div><div id="ride-notice" role="status" hidden></div><div id="street-bar"><span id="street-gear">Fäuste</span><button id="street-menu-button" type="button">Menü <kbd>Tab</kbd></button></div>
+<div id="pursuit" role="status" hidden><b></b><span></span></div><div id="ride-context" hidden></div><div id="ride-notice" role="status" hidden></div><div id="street-bar"><span id="street-gear">Fäuste</span><button id="street-menu-button" type="button">Menü <kbd>Tab</kbd></button></div>
   <div id="street-reticle" hidden aria-hidden="true"></div><div id="street-notice" role="status" hidden></div>
   <dialog id="street-menu" aria-labelledby="street-title">
     <header><h2 id="street-title">Spielmenü</h2><button data-close type="button" autofocus>Weiterspielen</button></header>
     <dl><dt>WASD</dt><dd>In Blickrichtung laufen</dd><dt>Shift / Leertaste</dt><dd>Sprinten / springen</dd><dt>Rechte Maustaste ziehen</dt><dd>Umschauen</dd><dt>Linksklick</dt><dd>Mit Fäusten schlagen oder mit der gewählten Waffe schießen</dd><dt>G / Q / R</dt><dd>Schlagen / Waffe wechseln / nachladen</dd><dt>F / M</dt><dd>Fahrer herausziehen, ein- oder aussteigen / Karte öffnen</dd></dl>
     <div class="street-options"><label>Ausrüstung <select id="street-loadout"><option value="0">Fäuste</option><option value="1">Arcade-Pistole</option><option value="2">Impuls-MP</option></select></label>
     <label>Blut &amp; Gore <select id="street-blood"><option value="2" selected>Extrem</option><option value="1">Reduziert</option><option value="0">Aus</option></select></label></div>
+    <p id="garage-inspection" hidden></p>
     <div class="street-actions"><button id="street-look" type="button">Freier Mausblick · Esc löst</button><button data-play-action="map">Inselkarte</button><button data-play-action="jobs">Aufträge</button><button data-play-action="camera">Kamera wechseln</button><button data-play-action="sound">Ton umschalten</button><button data-play-action="hud">Alle Anzeigen umschalten</button></div>
     <nav aria-label="Fortbewegung"><button data-play-action="person">Gehen 1</button><button data-play-action="car">Taxi 2</button><button data-play-action="cyclist">Rad 3</button><button data-play-action="helicopter">Heli 4</button></nav>
     <a href="https://github.com/mkn74027-del/vice-pixel/tree/main/manhattan#credits">Stadt und Kartendaten · Slop New York, NYC, MTA und © OpenStreetMap</a>
