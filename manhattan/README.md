@@ -1,16 +1,18 @@
 # VICE PIXEL — Manhattan
 
-[Spielen](https://mkn74027-del.github.io/vice-pixel/manhattan/?v=motion73)
+[Spielen – Original](https://mkn74027-del.github.io/vice-pixel/manhattan/?v=motion73) · [Spielen – iPad Edition](https://mkn74027-del.github.io/vice-pixel/manhattan/gta_3d.html)
 
 Befahrbare Manhattan-Insel mit echter Straßengeometrie, Gebäudeflächen und -höhen, Küsten, Brücken, Stadtverkehr, Fußgängern und Wahrzeichen. Die Umgebung und der Renderer stammen aus [Slop New York](https://github.com/mrdoob/slop-newyork), MIT, Stand `7fdf054aa7a8b1c005983a855fb3b308f2d9a948`. Eigenständige Ergänzungen: drei Stadtaufträge, zeit- und fahrzeugabhängige Kontrollpunkte, Geldbelohnungen, F zum Ein-/Aussteigen ins eigene Taxi, gerichtetes A*-GPS auf dem Verkehrsnetz, deutsche Oberflächenanpassungen und km/h.
 
 ## Start
 
-Online in einem aktuellen Chrome oder Edge mit WebGPU und aktivierter Grafikbeschleunigung öffnen. Beim ersten Start kann die Grafikvorbereitung 1–2 Minuten dauern. Keine Installation und kein Projekt-Download erforderlich. Die Engine-Abhängigkeit three.js wird aus einem fest gepinnten jsDelivr-Commit geladen. Diese neue Fassung ist deshalb **kein Offline-Ein-Datei-Spiel**.
+Für die Originalfassung: [Spielen](https://mkn74027-del.github.io/vice-pixel/manhattan/?v=motion73). Für die neue iPad-Fassung: [iPad Edition](https://mkn74027-del.github.io/vice-pixel/manhattan/gta_3d.html). Online in einem aktuellen Chrome oder Edge mit WebGPU und aktivierter Grafikbeschleunigung öffnen. Beim ersten Start kann die Grafikvorbereitung 1–2 Minuten dauern. Keine Installation und kein Projekt-Download erforderlich. Die Engine-Abhängigkeit three.js wird aus einem fest gepinnten jsDelivr-Commit geladen. Diese neue Fassung ist deshalb **kein Offline-Ein-Datei-Spiel**.
 
 Automatische Spielstand- und Sound-Einstellungen werden nur in einer flüchtigen Map im Arbeitsspeicher abgelegt; keine Nutzung von localStorage, IndexedDB oder Service Worker. Ein Neuladen setzt den Sitzungsfortschritt zurück. Übliche Browser-Caches sind davon unabhängig.
 
 ## Steuerung
+
+Auf Touch-Geräten: linker virtueller Stick zum Bewegen, die Aktionsknöpfe rechts für die kontextabhängigen Aktionen. Das Gerät am besten quer halten.
 
 | Taste / Eingabe | Aktion |
 |---|---|
