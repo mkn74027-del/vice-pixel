@@ -11,7 +11,7 @@
   <script type="importmap">
     {
       "imports": {
-        "./js/tsl-materials.js": "./js/tsl-materials-ipad.js?v=phase4",
+        "./js/tsl-materials.js": "./js/tsl-materials-ipad.js?v=phase5",
         "./js/ragdoll.js": "./js/ragdoll.js?v=motion73",
         "./js/driver-door.js": "./js/driver-door.js?v=motion73",
         "./js/car-damage.js": "./js/car-damage.js?v=motion73",
@@ -86,7 +86,7 @@
   <link rel="modulepreload" href="./js/audio-system.js?v=motion73" />
   <link rel="modulepreload" href="./js/main.js" />
   <script>window.__viceStorage=(()=>{const memory=new Map();return {getItem:key=>memory.get(key)??null,setItem:(key,value)=>memory.set(key,String(value)),removeItem:key=>memory.delete(key)};})();</script>
-  <script type="module" src="./js/main-ipad.js?v=phase4"></script>
+  <script type="module" src="./js/main-ipad.js?v=phase5"></script>
   <!-- Inter (UI) & Overpass (street-name signs: modelled on Highway Gothic, the US road sign typeface) -->
   <link rel="stylesheet" href="./css/style.css?v=motion73" />
   <style id="ipad-phase-1">
@@ -194,6 +194,7 @@
         </button>
       </div>
       <button id="btn-weather" class="tool-btn" type="button" aria-pressed="false" title="Regen einschalten"><span aria-hidden="true">🌧️</span><span class="tool-label">Regen</span></button>
+      <button id="btn-fog" class="tool-btn" type="button" aria-pressed="false" title="Dichten Stadtnebel einschalten"><span aria-hidden="true">🌫️</span><span class="tool-label">Nebel</span></button>
       <span class="toolbar-divider" aria-hidden="true"></span>
       <button id="btn-teleport" class="tool-btn" type="button" popovertarget="teleport-popover" title="Teleport the active player">
         <svg class="icon" aria-hidden="true"><use href="#i-pin"/></svg><span class="tool-label">Schnellreise</span><svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-down"/></svg>
