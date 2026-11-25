@@ -46,6 +46,15 @@ function createWeatherEffects(scene, { reduced = false } = {}) {
   dust.frustumCulled = false;
   scene.add(dust);
 
+  // A brief, broad ambient flash simulates distant lightning without a shadow map or extra geometry.
+  // It is intentionally subtle and only active while rain is enabled to keep the iPad GPU budget low.
+  const lightning = new THREE.AmbientLight(0xc8ddff, 0);
+  lightning.name = 'IPadDistantLightning';
+  scene.add(lightning);
+  let lightningCooldown = 7 + Math.random() * 8;
+  let lightningFlash = 0;
+  let lightningEnabled = true;
+
   const dummy = new THREE.Object3D();
   let rainEnabled = false;
   function toggleRain() {
@@ -70,7 +79,27 @@ function createWeatherEffects(scene, { reduced = false } = {}) {
     }
     dustGeometry.attributes.position.needsUpdate = true;
 
-    if (!rainEnabled) return;
+    if (!rainEnabled) {
+      lightning.intensity = 0;
+      lightningFlash = 0;
+      return;
+    }
+
+    // Random, double-pulse lightning: a quick main flash followed by a weaker reflection.
+    lightningCooldown -= step;
+    if (lightningCooldown <= 0 && lightningFlash <= 0) {
+      lightningFlash = 0.34;
+      lightningCooldown = 9 + Math.random() * (reduced ? 13 : 9);
+    }
+    if (lightningFlash > 0) {
+      lightningFlash -= step;
+      const t = Math.max(0, lightningFlash);
+      const pulse = t > 0.20 ? Math.sin((0.34 - t) * 42) : Math.sin((0.20 - t) * 58) * 0.42;
+      lightning.intensity = Math.max(0, pulse) * (reduced ? 0.55 : 0.8);
+    } else {
+      lightning.intensity = 0;
+    }
+
     const windX = Math.sin(performance.now() * 0.00018) * 2.2;
     for (let i = 0; i < rainCount; i++) {
       const p = rainData[i];
@@ -91,7 +120,7 @@ function createWeatherEffects(scene, { reduced = false } = {}) {
   }
 
   function dispose() {
-    scene.remove(rain, dust);
+    scene.remove(rain, dust, lightning);
     rainGeometry.dispose();
     rainMaterial.dispose();
     dustGeometry.dispose();
