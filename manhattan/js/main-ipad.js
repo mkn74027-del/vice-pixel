@@ -27,6 +27,7 @@ import { LightingSystem } from './lighting-ipad.js';
 import { NYCMapSystem } from './nyc-map.js?v=manhattan-3';
 import { setupSceneCulling, updateSceneCulling } from './scene-culling.js';
 import { CityAudioSystem } from './audio-system.js';
+import { createWeatherEffects } from './weather-effects-ipad.js';
 
 // Application setup, shader warm-up and frame loop.
 
@@ -128,6 +129,7 @@ async function initApp() {
   await showLoadingStage('Creating sky and environment lighting...', 'lighting');
   const scene = new THREE.Scene();
   const lightingSystem = new LightingSystem(scene, renderer);
+  const weatherEffects = createWeatherEffects(scene, { reduced: isTouchDevice });
   markInit('lighting');
 
   // 3. Build Manhattan Geography, Iconic Landmarks, Blocks, Street Details & Traffic
@@ -306,6 +308,13 @@ async function initApp() {
   const modeButtons = document.querySelectorAll('[data-mode]');
   const cameraButtons = document.querySelectorAll('[data-camera]');
   const timeButtons = document.querySelectorAll('[data-time]');
+  const weatherButton = document.getElementById('btn-weather');
+  weatherButton?.addEventListener('click', () => {
+    const enabled = weatherEffects.toggleRain();
+    weatherButton.setAttribute('aria-pressed', String(enabled));
+    weatherButton.querySelector('.tool-label').textContent = enabled ? 'Regen an' : 'Regen';
+    weatherButton.title = enabled ? 'Regen ausschalten' : 'Regen einschalten';
+  });
   const teleportButtons = document.querySelectorAll('[data-teleport]');
   const hudToggleBtn = document.getElementById('btn-toggle-hud');
   const modeSwitch = document.getElementById('mode-switch');
@@ -795,6 +804,7 @@ async function initApp() {
     if (cityBlocks.updateLights) cityBlocks.updateLights(cameraSystem.camera);
     if (streetDetails.update) streetDetails.update(cameraSystem.camera);
     lightingSystem.update(cameraSystem.currentPos);
+    weatherEffects.update(dt, cameraSystem.currentPos, cameraSystem.camera);
     colorGrade.update();
     cityContracts.update(worldDt, elapsed);
     streetPlay.update(worldDt);
