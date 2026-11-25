@@ -28,6 +28,7 @@ import { NYCMapSystem } from './nyc-map.js?v=manhattan-3';
 import { setupSceneCulling, updateSceneCulling } from './scene-culling.js';
 import { CityAudioSystem } from './audio-system.js';
 import { createWeatherEffects } from './weather-effects-ipad.js?v=phase6';
+import { createSunShafts } from './sun-shafts-ipad.js?v=phase7';
 
 // Application setup, shader warm-up and frame loop.
 
@@ -130,6 +131,7 @@ async function initApp() {
   const scene = new THREE.Scene();
   const lightingSystem = new LightingSystem(scene, renderer);
   const weatherEffects = createWeatherEffects(scene, { reduced: isTouchDevice });
+  const sunShafts = createSunShafts(scene, { reduced: isTouchDevice });
   markInit('lighting');
 
   // 3. Build Manhattan Geography, Iconic Landmarks, Blocks, Street Details & Traffic
@@ -792,6 +794,7 @@ async function initApp() {
     if (worldDt > 0) controllerManager.update(worldDt, elapsed, cameraSystem.initialized ? cameraSystem.currentPos : null);
     if(worldDt>0)streetRides.advanceRoll(worldDt);
     cameraSystem.update(dt, elapsed);
+    sunShafts.update(dt, cameraSystem.camera, lightingSystem.sunLight);
     streetDetails.signalClock.value = elapsed;
     if (worldDt > 0) trafficSystem.update(
       worldDt,
