@@ -207,6 +207,7 @@ class LightingSystem {
   constructor(scene, renderer = null) {
     this.scene = scene;
     this.activePresetId = 'golden';
+    this.weatherFogEnabled = false;
     // What is shown, and a change of time of day under way (blending `from` into `to`)
     this.state = lightingState();
     this.from = lightingState();
@@ -350,8 +351,19 @@ class LightingSystem {
       renderTarget: this.envRenderTarget
     });
     this.scene.environment = this.envRenderTarget.texture;
+    // The aerial-perspective node needs the first baked sky texture. The render target is null
+    // during construction, so install the node here, immediately after the first environment bake.
+    if (!this.scene.fogNode) this.scene.fogNode = this.createAerialFogNode();
     this.sky.showSunDisc.value = 1;
     this.scene.add(this.sky);
+  }
+
+  setWeatherFog(enabled) {
+    this.weatherFogEnabled = Boolean(enabled);
+    if (this.uFogDensity) {
+      this.uFogDensity.value = this.state.fogDensity * (this.weatherFogEnabled ? 3.2 : 1.0);
+    }
+    return this.weatherFogEnabled;
   }
 
   // Switch to a time of day at once
@@ -395,7 +407,7 @@ class LightingSystem {
 
     this.scene.fog.color.copy(s.fogColor);
     this.scene.fog.density = s.fogDensity;
-    if (this.uFogDensity) this.uFogDensity.value = s.fogDensity;
+    if (this.uFogDensity) this.uFogDensity.value = s.fogDensity * (this.weatherFogEnabled ? 3.2 : 1.0);
 
     // Update physical Preetham SkyMesh uniforms
     this.sky.mieCoefficient.value = s.mieCoefficient;
