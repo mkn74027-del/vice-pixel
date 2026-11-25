@@ -315,6 +315,13 @@ async function initApp() {
     weatherButton.querySelector('.tool-label').textContent = enabled ? 'Regen an' : 'Regen';
     weatherButton.title = enabled ? 'Regen ausschalten' : 'Regen einschalten';
   });
+  const fogButton = document.getElementById('btn-fog');
+  fogButton?.addEventListener('click', () => {
+    const enabled = lightingSystem.setWeatherFog(!lightingSystem.weatherFogEnabled);
+    fogButton.setAttribute('aria-pressed', String(enabled));
+    fogButton.querySelector('.tool-label').textContent = enabled ? 'Nebel an' : 'Nebel';
+    fogButton.title = enabled ? 'Nebel ausschalten' : 'Dichten Stadtnebel einschalten';
+  });
   const teleportButtons = document.querySelectorAll('[data-teleport]');
   const hudToggleBtn = document.getElementById('btn-toggle-hud');
   const modeSwitch = document.getElementById('mode-switch');
