@@ -27,7 +27,7 @@ import { LightingSystem } from './lighting-ipad.js';
 import { NYCMapSystem } from './nyc-map.js?v=manhattan-3';
 import { setupSceneCulling, updateSceneCulling } from './scene-culling.js';
 import { CityAudioSystem } from './audio-system.js';
-import { createWeatherEffects } from './weather-effects-ipad.js';
+import { createWeatherEffects } from './weather-effects-ipad.js?v=phase6';
 
 // Application setup, shader warm-up and frame loop.
 
