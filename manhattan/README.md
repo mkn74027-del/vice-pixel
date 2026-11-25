@@ -58,3 +58,7 @@ Kontrollpunkte benötigen 1,2 Sekunden bei geringer Geschwindigkeit. Belohnungen
 - Ergänzende Referenz geprüft: [Neon Mayhem](https://github.com/pranshuparmar/neon-mayhem), Apache-2.0. Daraus wurde kein Code übernommen.
 
 Der tatsächliche Stadtplan ist die Referenz. Einzelne Fassaden, Innenräume und Stadtobjekte sind prozedurale Vereinfachungen; es ist keine vollständige 1:1-Reproduktion aller New Yorker Details und kein GTA-V-Nachbau.
+
+## iPad Edition – Grafikphasen
+
+Die separate `gta_3d.html`-Fassung behält den WebGPU-Renderer bei. Für Touch-Geräte werden Renderauflösung, Schattenatlas, Postprocessing und Wetterpartikel reduziert. Die iPad-Fassung ergänzt optionalen Regen, atmosphärischen Staub, Gewitterblitze, dichteren Stadtnebel, animierte Wasser-Kaustiken und kostengünstige Sonnenstrahlen. Die Sonnenstrahlen nutzen wenige tiefengeprüfte Flächen statt eines teuren volumetrischen Raymarching-Passes. Diese Effekte sind keine Garantie für WebGPU-Unterstützung in jedem iPad-Browser; die tatsächliche Gerätekompatibilität und Bildrate müssen auf dem Zielgerät geprüft werden.
